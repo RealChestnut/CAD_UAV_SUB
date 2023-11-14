@@ -27,8 +27,12 @@
 #include <std_msgs/Float32MultiArray.h>
 #include <algorithm>
 #include <iterator>
+#include <sys/ioctl.h>
 //#include <bits/stdc++.h>
 #include <sstream>
+
+
+#define TIOCINQ 0x541B
 
 using namespace std;
 serial::Serial ser;
@@ -100,16 +104,19 @@ int main (int argc, char** argv){
     ros::Subscriber write_sub = nh.subscribe("write", 1000, write_callback);
     ros::Publisher read_pub_from_main = nh.advertise<std_msgs::Float32MultiArray>("read_serial_magnetic", 1);
 
+
     try
     {
         ser.setPort("/dev/ttyS0");
-        ser.setBaudrate(115200);
+        ser.setBaudrate(57600);
         serial::Timeout to = serial::Timeout::simpleTimeout(1000);
+	serial::flowcontrol_t flow_state = serial::flowcontrol_t::flowcontrol_none;
+	ser.setFlowcontrol(flow_state);
+
 
         ser.setTimeout(to);
-        
-	
 	ser.open();
+	ser.flush(); //데이터가 먼저 cpu queue에 maximum으로 들어와있어서 포트가 터지는거 방지용
     }
     catch (serial::IOException& e)
     {
@@ -129,22 +136,20 @@ int main (int argc, char** argv){
         ros::spinOnce();
 
 	buffer.clear();
-	
-	
-	
-	//if(ser.available()){
-            //ROS_INFO_STREAM("Reading from serial port");
-	    
-	
-	    if(ser.available()){ser.write("1");}
+
 
 	    //To avoid undefined data for software blocking safety
-            reconfigure_port();
-	    receive_data_test(buffer);
-
+            //reconfigure_port();
+	    //receive_data_test(buffer);
 	    if(ser.available()){buffer= ser.read(ser.available());}
-	    
 
+	     int count = 0;
+             int dumi = 0;
+             if(ser.isOpen()){dumi=ser.fd_num();
+                ioctl (dumi, TIOCINQ, &count);
+                ROS_INFO_STREAM(count);}
+	    
+		
 	    ROS_INFO_STREAM(buffer);
 
 	    std_msgs::Float32MultiArray result;

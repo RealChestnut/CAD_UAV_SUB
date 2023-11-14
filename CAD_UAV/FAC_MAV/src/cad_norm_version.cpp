@@ -56,16 +56,16 @@ int main(int argc, char **argv)
   //initSubscriber();
 
     /////////////////////////////////////////////////SUBSCFRIBER START//////////////////////////////////////////////////////
-    dynamixel_state = nh.subscribe("joint_states",100,jointstate_Callback, ros::TransportHints().tcpNoDelay()); // servo angle data from dynamixel
+    dynamixel_state = nh.subscribe("joint_states",1,jointstate_Callback, ros::TransportHints().tcpNoDelay()); // servo angle data from dynamixel
     att = nh.subscribe("/imu/data",1,imu_Callback,ros::TransportHints().tcpNoDelay()); // angle data from IMU
-    rc_in = nh.subscribe("/sbus",100,sbus_Callback,ros::TransportHints().tcpNoDelay()); // sbus data from arduino
-    battery_checker = nh.subscribe("/battery",100,battery_Callback,ros::TransportHints().tcpNoDelay()); // battery sensor data from arduino
+    rc_in = nh.subscribe("/sbus",1,sbus_Callback,ros::TransportHints().tcpNoDelay()); // sbus data from arduino
+    battery_checker = nh.subscribe("/battery",1,battery_Callback,ros::TransportHints().tcpNoDelay()); // battery sensor data from arduino
     Switch_checker = nh.subscribe("switch_onoff",1,switch_Callback,ros::TransportHints().tcpNoDelay()); // switch interrupt from arduino
 
-    t265_position=nh.subscribe("/t265_pos",100,t265_position_Callback,ros::TransportHints().tcpNoDelay()); // position data from t265
-    t265_rotation=nh.subscribe("/t265_rot",100,t265_rotation_Callback,ros::TransportHints().tcpNoDelay()); // angle data from t265
+    t265_position=nh.subscribe("/t265_pos",1,t265_position_Callback,ros::TransportHints().tcpNoDelay()); // position data from t265
+    t265_rotation=nh.subscribe("/t265_rot",1,t265_rotation_Callback,ros::TransportHints().tcpNoDelay()); // angle data from t265
 
-    t265_odom=nh.subscribe("/rs_t265/odom/sample",100,t265_Odom_Callback,ros::TransportHints().tcpNoDelay()); // odometry data from t265
+    t265_odom=nh.subscribe("/rs_t265/odom/sample",1,t265_Odom_Callback,ros::TransportHints().tcpNoDelay()); // odometry data from t265
 
     main2sub_data=nh.subscribe("read_serial_magnetic",1,main2sub_data_Callback,ros::TransportHints().tcpNoDelay()); // wrench data subscribe
 
@@ -77,28 +77,28 @@ int main(int argc, char **argv)
     goal_dynamixel_position = nh.advertise<sensor_msgs::JointState>("goal_dynamixel_position",100); // desired servo angle command ::theta 1234
 
     euler = nh.advertise<geometry_msgs::Vector3>("angle",1); // euler angle
-    desired_angle = nh.advertise<geometry_msgs::Vector3>("desired_angle",100); // desired euler angle
+    desired_angle = nh.advertise<geometry_msgs::Vector3>("desired_angle",1); // desired euler angle
 
 
-    desired_torque = nh.advertise<geometry_msgs::Vector3>("torque_d",100);
+    desired_torque = nh.advertise<geometry_msgs::Vector3>("torque_d",1);
     torque_dhat_pub = nh.advertise<geometry_msgs::Vector3>("torque_dhat",1); //23.10.09
-    desired_splited_yaw_torque = nh.advertise<std_msgs::Float32MultiArray>("splited_yaw_torque_d",100); // 23.10.05
+    desired_splited_yaw_torque = nh.advertise<std_msgs::Float32MultiArray>("splited_yaw_torque_d",1); // 23.10.05
 
-    linear_velocity = nh.advertise<geometry_msgs::Vector3>("lin_vel",100);
-    desired_velocity = nh.advertise<geometry_msgs::Vector3>("lin_vel_d",100);
+    linear_velocity = nh.advertise<geometry_msgs::Vector3>("lin_vel",1);
+    desired_velocity = nh.advertise<geometry_msgs::Vector3>("lin_vel_d",1);
 
-    angular_velocity = nh.advertise<geometry_msgs::Vector3>("ang_vel",100);
+    angular_velocity = nh.advertise<geometry_msgs::Vector3>("ang_vel",1);
 
-    desired_position = nh.advertise<geometry_msgs::Vector3>("position_d",100);
-    position = nh.advertise<geometry_msgs::Vector3>("position",100);
+    desired_position = nh.advertise<geometry_msgs::Vector3>("position_d",1);
+    position = nh.advertise<geometry_msgs::Vector3>("position",1);
 
-    desired_force = nh.advertise<geometry_msgs::Vector3>("force_d",100);
+    desired_force = nh.advertise<geometry_msgs::Vector3>("force_d",1);
 
-    battery_voltage = nh.advertise<std_msgs::Float32>("battery_voltage",100);
+    battery_voltage = nh.advertise<std_msgs::Float32>("battery_voltage",1);
 
-    Force_allocation_factor = nh.advertise<std_msgs::Float32MultiArray>("force_allocation_factor",100);
+    Force_allocation_factor = nh.advertise<std_msgs::Float32MultiArray>("force_allocation_factor",1);
 
-    delta_time = nh.advertise<std_msgs::Float32>("delta_t",100);
+    delta_time = nh.advertise<std_msgs::Float32>("delta_t",1);
     ToSubAgent = nh.advertise<std_msgs::String>("ToSubData",1);
     
     ros::Timer timerPublish = nh.createTimer(ros::Duration(1.0/200.0),std::bind(publisherSet));

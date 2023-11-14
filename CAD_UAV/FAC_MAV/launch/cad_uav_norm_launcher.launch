@@ -3,8 +3,7 @@
     <include file="$(find setting_tf2)/launch/tf2_setting.launch">
     </include>
    <!-- Dynamixel Workbench Controller -->
-  
-<?ignore
+ <?ignore 
 <include file="$(find dynamixel_workbench_controllers)/launch/position_control.launch">
         <arg name="device_name"        		default="/dev/ttyU2D2"/>
         <arg name="baud_rate"   		default="4500000"/>
