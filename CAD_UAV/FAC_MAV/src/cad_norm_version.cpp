@@ -143,7 +143,6 @@ int main(int argc, char **argv)
         
       }
     }
-    bool TRUE=true;
     if(!main_agent)
     {
       if(!kill_mode){

@@ -2,8 +2,8 @@
     
     <include file="$(find setting_tf2)/launch/tf2_setting.launch">
     </include>
-   <!-- Dynamixel Workbench Controller -->
- <?ignore 
+<?ignore   
+<!-- Dynamixel Workbench Controller -->
 <include file="$(find dynamixel_workbench_controllers)/launch/position_control.launch">
         <arg name="device_name"        		default="/dev/ttyU2D2"/>
         <arg name="baud_rate"   		default="4500000"/>
@@ -83,17 +83,17 @@
 	
 	<!--Tilt flight mode-->
 		<!--Tilt Mode attitude_r gains-->
-		<param name="tilt_attitude_r_P_gain"	value="15.0"/> <!-- 8.5 -->	
+		<param name="tilt_attitude_r_P_gain"	value="20.0"/> <!-- 8.5 -->	
 		<param name="tilt_attitude_r_I_gain"	value="1.2"/> <!-- 1.2 -->
-		<param name="tilt_attitude_r_D_gain"	value="12.0"/> <!-- 8.5 -->
+		<param name="tilt_attitude_r_D_gain"	value="8.0"/> <!-- 8.5 -->
 		
 		<!--Tilt Mode attitude_p gains-->
-		<param name="tilt_attitude_p_P_gain"	value="0.15"/>	
-		<param name="tilt_attitude_p_I_gain"	value="0.0"/>	
-		<param name="tilt_attitude_p_D_gain"	value="0.0"/> 
+		<param name="tilt_attitude_p_P_gain"	value="20.0"/>	
+		<param name="tilt_attitude_p_I_gain"	value="1.2"/>	
+		<param name="tilt_attitude_p_D_gain"	value="8.0"/> 
 
 		<!--Tilt Mode attitude_y gains-->
-		<param name="tilt_attitude_y_P_gain"	value="15.0"/>
+		<param name="tilt_attitude_y_P_gain"	value="12.0"/>
 		<param name="tilt_attitude_y_I_gain"	value="0"/>
 		<param name="tilt_attitude_y_D_gain"	value="3.0"/>
 

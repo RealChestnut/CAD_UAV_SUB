@@ -18,7 +18,7 @@ int main(int argc, char **argv){
     static_transformStamped.transform.translation.y=-0.00704;
     static_transformStamped.transform.translation.z=0.00609;
     tf2::Quaternion quat;
-    quat.setRPY(-90.0*PI/180.0,-45*PI/180.0,-90.0*PI/180.0);
+    quat.setRPY(-90.0*PI/180.0,-45*PI/180.0, -135*PI/180.0);
     static_transformStamped.transform.rotation.x=quat.x();
     static_transformStamped.transform.rotation.y=quat.y();
     static_transformStamped.transform.rotation.z=quat.z();

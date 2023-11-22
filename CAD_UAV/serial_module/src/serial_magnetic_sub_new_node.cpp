@@ -32,7 +32,6 @@
 #include <sstream>
 
 
-#define TIOCINQ 0x541B
 
 using namespace std;
 serial::Serial ser;
@@ -140,17 +139,11 @@ int main (int argc, char** argv){
 
 	    //To avoid undefined data for software blocking safety
             //reconfigure_port();
-	    //receive_data_test(buffer);
 	    if(ser.available()){buffer= ser.read(ser.available());}
-
-	     int count = 0;
-             int dumi = 0;
-             if(ser.isOpen()){dumi=ser.fd_num();
-                ioctl (dumi, TIOCINQ, &count);
-                ROS_INFO_STREAM(count);}
-	    
 		
 	    ROS_INFO_STREAM(buffer);
+
+	    receive_data_test(buffer);
 
 	    std_msgs::Float32MultiArray result;
 
@@ -216,21 +209,27 @@ void receive_data_test(const string& str){
                 
 		check_ascii = static_cast<int>(str[i]);
 		//ROS_INFO_STREAM(check_ascii);
-		if(check_ascii<0){error_cnt++;}
-		if(error_cnt>3){
+		if(check_ascii<0){
+			ROS_INFO_STREAM(check_ascii);
+			ser.flush();
+			buffer.clear();
+			//error_cnt++;
+		}
+		
+		/*if(error_cnt>3){
 			if(ser.available()){
 				ser.write("0");}}
 		if(error_cnt>50){
 			ser.close();
 			error_cnt=0;}
 
-		i++;
+		i++;*/
 	}
-
+	/*
 	if(!ser.isOpen()){
 		ROS_INFO("close");
 		reconfig_port_flag = true;
-	}
+	}*/
 }
 int wait_cnt=0;
 void reconfigure_port(){

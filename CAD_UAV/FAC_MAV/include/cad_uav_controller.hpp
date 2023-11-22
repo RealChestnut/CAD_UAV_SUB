@@ -54,9 +54,9 @@ double r_arm = 0.3025;// m // diagonal length between thruster x2
 double l_servo = 0.035; // length from servo motor to propeller
 
 double mass_system =0.0; // system mass (kg) ex) M = main+sub1+sub2
-double mass_main = 9.0; // main drone mass(kg) 
-double mass_sub1 = 9.0; // sub1 drone mass (kg)
-double mass_sub2 = 9.0; // sub2 drone mass (kg)
+double mass_main = 8.80; // main drone mass(kg) 
+double mass_sub1 = 0.0; // sub1 drone mass (kg)
+double mass_sub2 = 0.0; // sub2 drone mass (kg)
 
 double r2=sqrt(2); // root(2)
 double l_module = 0.50; //(m) module horizontal body length
@@ -300,10 +300,9 @@ Eigen::VectorXd wrench_allo_vector(6);
 
 
 int module_num=0;
-bool mono_flight = false;// 결합 시퀀스시에는 이 텀이 바뀌게 설정
+bool mono_flight = true;// 결합 시퀀스시에는 이 텀이 바뀌게 설정
 int button_cnt=0;
 bool main_agent=false; 
-bool sub_agent=true;
 double servo_90rot=1.5708; //90deg
 void shape_detector()
 {
@@ -427,10 +426,14 @@ void UpdateParameter()
   // 업데이트 하고자 할 경우 함수 루프에서 한번더 돌려야함.
  
 
-  int num = 2; // 추후에 switch코드와 호환될 수 있도록 수정23.10.16
-
+  int num = 1; // 추후에 switch코드와 호환될 수 있도록 수정23.10.16
+  main_agent=true;
+  mono_flight=true;
   if(num==1){
-                    
+                
+	  	CoM_hat.x = -0.001;
+                CoM_hat.y = 0.012;
+                CoM_hat.z = -0.086;
 
                 mass_system = mass_main;
 
@@ -536,15 +539,15 @@ void Command_Generator()
     rpy_desired.x = 0.0; 
     rpy_desired.y = 0.0;
 
-    if(main_agent){/// 메인드론인 경우 Sbus[0]를 yaw desired input으로 사용, 서브드론은 sbus[3]
-        y_d_tangent=y_vel_limit*(((double)Sbus[0]-(double)1500)/(double)500);
+    if(main_agent && mono_flight){/// 메인드론인 경우 Sbus[0]를 yaw desired input으로 사용, 서브드론은 sbus[3]
+        y_d_tangent=y_vel_limit*(((double)Sbus[3]-(double)1500)/(double)500);
         if(fabs(y_d_tangent)<y_d_tangent_deadzone || fabs(y_d_tangent)>y_vel_limit) y_d_tangent=0;
         rpy_desired.z+=y_d_tangent;}
     
     //---------------------------------position command------------------------------------------//
 
     XYZ_desired.x = XYZ_desired_base.x - XY_limit*(((double)Sbus[1]-(double)1500)/(double)500);
-    XYZ_desired.y = XYZ_desired_base.y + XY_limit*(((double)Sbus[3]-(double)1500)/(double)500);
+    XYZ_desired.y = XYZ_desired_base.y + XY_limit*(((double)Sbus[0]-(double)1500)/(double)500);
     
     if(altitude_mode){ 
       if(Sbus[2]>1800){
@@ -1238,10 +1241,11 @@ void PWM_signal_Generator()
   if(fabs(servo_command2)>hardware_servo_limit) servo_command2 = (servo_command2/fabs(servo_command2))*hardware_servo_limit;
   if(fabs(servo_command3)>hardware_servo_limit) servo_command3 = (servo_command3/fabs(servo_command3))*hardware_servo_limit;
   if(fabs(servo_command4)>hardware_servo_limit) servo_command4 = (servo_command4/fabs(servo_command4))*hardware_servo_limit;
-  if(sub_agent && !mono_flight){ /// 서브드론의 경우 Sbus[3]를 다이나믹셀 position desired input으로 사용
+  if(!main_agent && !mono_flight){ /// 서브드론의 경우 Sbus[3]를 다이나믹셀 position desired input으로 사용
 
         swap_dynamixel_angle  = 0.01*(((float)Sbus[3]-(float)1500)/(float)500); // angle data generate
         swap_dynamixel_ang_d += swap_dynamixel_angle;
+	ROS_INFO_STREAM(swap_dynamixel_angle);
 	
   } // servo angle initial position + swap d
 
@@ -1461,14 +1465,14 @@ void sbus_Callback(const std_msgs::Int16MultiArray::ConstPtr& array)
     for(int i=0;i<10;i++){
 		Sbus[i]=map<int16_t>(array->data[i], 352, 1696, 1000, 2000);
 	}
-if(!sub_agent && !mono_flight){	
       if(Sbus[4]<1500){
         kill_mode=true;
         tilt_mode=false;}
       else {
         kill_mode=false;
         tilt_mode=true;}
-      
+   if(main_agent && mono_flight){
+   
       if(Sbus[5]>1500) altitude_mode=true;
       else altitude_mode=false;
 
