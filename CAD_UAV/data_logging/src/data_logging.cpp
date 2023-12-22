@@ -44,7 +44,7 @@ geometry_msgs::Vector3 desired_force;
 geometry_msgs::Vector3 desired_torque;
 geometry_msgs::Vector3 optitrack_position;
 geometry_msgs::Vector3 optitrack_attitude;
-
+geometry_msgs::Vector3 optitrack_lin_vel;
 double PWM_cmd[4]={1000., 1000., 1000., 1000.};
 double individual_motor_thrust[4]={0.0, 0.0, 0.0, 0.0};
 double battery_voltage=22.2;
@@ -83,6 +83,7 @@ void battery_callback(const std_msgs::Int16& msg);
 void serial_data_callback(const std_msgs::Float32MultiArray::ConstPtr& msg);
 void Desired_torque_y_split_callback(const std_msgs::Float32MultiArray::ConstPtr& msg);
 void optitrack_pose_callback(const std_msgs::Float32MultiArray::ConstPtr& msg);
+void optitrack_linear_velocity_Callback(const geometry_msgs::Vector3& msg);
 
 void publisherSet();
 
@@ -104,6 +105,7 @@ int main(int argc, char **argv)
         ros::Subscriber desired_torque_log=nh.subscribe("/torque_d",1,desired_torque_callback,ros::TransportHints().tcpNoDelay());
         ros::Subscriber linear_velocity_log=nh.subscribe("/lin_vel",1,linear_velocity_callback,ros::TransportHints().tcpNoDelay());
         ros::Subscriber desired_linear_velocity_log=nh.subscribe("/lin_vel_d",1,desired_linear_velocity_callback,ros::TransportHints().tcpNoDelay());
+	ros::Subscriber linear_velocity_opti_log=nh.subscribe("/lin_vel_opti",1,optitrack_linear_velocity_Callback,ros::TransportHints().tcpNoDelay());
 
 	ros::Subscriber position_log=nh.subscribe("/position",1,pos_callback,ros::TransportHints().tcpNoDelay());
 	ros::Subscriber desired_position_log=nh.subscribe("/position_d",1,desired_pos_callback,ros::TransportHints().tcpNoDelay());
@@ -122,7 +124,7 @@ int main(int argc, char **argv)
 
 void publisherSet()
 {
-	data_log.data.resize(67);
+	data_log.data.resize(70);
 	data_log.data[0]=attitude.x;
 	data_log.data[1]=attitude.y;
 	data_log.data[2]=attitude.z;
@@ -190,6 +192,10 @@ void publisherSet()
         data_log.data[64]=optitrack_attitude.x;
         data_log.data[65]=optitrack_attitude.y;
         data_log.data[66]=optitrack_attitude.z;
+	data_log.data[67]=optitrack_lin_vel.x;
+	data_log.data[68]=optitrack_lin_vel.y;
+	data_log.data[69]=optitrack_lin_vel.z;
+
 
 	data_log_publisher.publish(data_log);
 }
@@ -303,5 +309,13 @@ void optitrack_pose_callback(const std_msgs::Float32MultiArray::ConstPtr& msg){ 
 	optitrack_attitude.x=msg->data[3];
 	optitrack_attitude.y=msg->data[4];
 	optitrack_attitude.z=msg->data[5];
+
+}
+
+void optitrack_linear_velocity_Callback(const geometry_msgs::Vector3& msg){
+	optitrack_lin_vel.x = msg.x;
+	optitrack_lin_vel.y = msg.y;
+	optitrack_lin_vel.z = msg.z;
+
 
 }

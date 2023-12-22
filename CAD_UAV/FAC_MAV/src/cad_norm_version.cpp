@@ -89,6 +89,7 @@ int main(int argc, char **argv)
 
     linear_velocity = nh.advertise<geometry_msgs::Vector3>("lin_vel",1);
     desired_velocity = nh.advertise<geometry_msgs::Vector3>("lin_vel_d",1);
+    linear_velocity_opti = nh.advertise<geometry_msgs::Vector3>("lin_vel_opti",1);//23.12.22
 
     angular_velocity = nh.advertise<geometry_msgs::Vector3>("ang_vel",1);
 

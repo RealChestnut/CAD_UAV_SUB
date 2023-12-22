@@ -255,6 +255,7 @@ ros::Publisher Force_allocation_factor;
 ros::Publisher linear_velocity;
 ros::Publisher desired_velocity;
 ros::Publisher angular_velocity;
+ros::Publisher linear_velocity_opti;
 
 ros::Publisher desired_position;
 ros::Publisher position;
@@ -283,6 +284,7 @@ geometry_msgs::Vector3 main_attitude_opti;
 geometry_msgs::Vector3 sub_position_opti;
 geometry_msgs::Vector3 sub_attitude_opti;
 geometry_msgs::Vector3 lin_vel_opti;
+geometry_msgs::Vector3 lin_vel_opti_LPF;
 geometry_msgs::Vector3 main_position_opti_prev;
 geometry_msgs::Vector3 main_position_opti_new;
 geometry_msgs::Vector3 sub_position_opti_prev;
@@ -1444,9 +1446,9 @@ void reset_data()
 
   rpy_desired.z=sub_attitude_opti.z;//t265_att.z;     //[J]This line ensures that yaw desired right after disabling the kill switch becomes current yaw attitude
 
-  XYZ_desired_base.x=sub_position_opti_new.x;
-  XYZ_desired_base.y=sub_position_opti_new.y;
-  XYZ_desired_base.z=sub_position_opti_new.z;
+  XYZ_desired_base.x=position_from_t265.x;
+  XYZ_desired_base.y=position_from_t265.y;
+  XYZ_desired_base.z=position_from_t265.z;
 
   e_r_i = 0;
   e_p_i = 0;
@@ -1523,7 +1525,8 @@ void PublishData()
   desired_position.publish(XYZ_desired);//desired position 
 
   linear_velocity.publish(lin_vel); // actual linear velocity 
-  desired_velocity.publish(lin_vel_desired); // desired linear velocity   
+  desired_velocity.publish(lin_vel_desired); // desired linear velocity 
+  linear_velocity_opti.publish(lin_vel_opti); 
   
   desired_force.publish(F_xyzd); // desired force it need only tilt mode 	
   Force_allocation_factor.publish(alpha_data);
@@ -1829,10 +1832,16 @@ void sub_pose_data_Callback(const std_msgs::Float32MultiArray& msg){
 
 
         // global axis :: linear velocity
+
     lin_vel.x=lin_vel_LPF(0);//lin_vel_opti.x;
     lin_vel.y=lin_vel_LPF(1);//lin_vel_opti.y;
     lin_vel.z=lin_vel_LPF(2);//lin_vel_opti.z;
 
+	/*
+    lin_vel_opti_LPF.x=lin_vel_LPF(0);
+    lin_vel_opti_LPF.y=lin_vel_LPF(1);
+    lin_vel_opti_LPF.z=lin_vel_LPF(2);
+	*/
     sub_position_opti_prev.x = sub_position_opti_new.x;
     sub_position_opti_prev.y = sub_position_opti_new.y;
     sub_position_opti_prev.z = sub_position_opti_new.z;

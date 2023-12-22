@@ -1,11 +1,13 @@
 <launch>
- <?ignore  
+
     <include file="$(find setting_tf2)/launch/tf2_setting.launch">
  </include>
-?>
+
  <include file="$(find optitrack)/launch/optitrack.launch">
  </include>
- <node pkg="setting_tf2_opti" type="setting_drone_tf_opti" name="setting_drone_tf_node"/>
+
+ <node pkg="setting_tf2_opti" type="setting_drone_tf_opti" name="setting_drone_tf_opti_node"/> 
+
 
 <!-- Dynamixel Workbench Controller -->
   <include file="$(find dynamixel_workbench_controllers)/launch/position_control.launch">
@@ -18,6 +20,7 @@
 	<arg name="position_d_gain"		default="300"/>
 	<arg name="scan_range"                  default="50"/> 
     </include> 
+
 
 <!-- ros_mscl -->
     <include file="$(find microstrain_inertial_driver)/launch/microstrain.launch">
@@ -38,11 +41,11 @@
 	  <arg name="nmea_frame_id"          default = "nmea" />
 	  <arg name="use_enu_frame"          default = "false" />
     </include> 
-<?ignore
+
     <!-- t265 -->
     <include file="$(find realsense2_camera)/launch/rs_t265.launch">
     </include> 
-?>
+
 <!-- rosserial_arduino -->
     <node pkg="rosserial_arduino" type="serial_node.py" name="ros_arduino_PWMs" >
 	<param name="port" value="/dev/ttyARDUINO"/>
@@ -113,12 +116,12 @@
 
 
 		<!--Tilt Mode Altitude gains-->
-		<param name="tilt_altitude_P_gain"	value="10.0"/> <!--13.0--> 
-		<param name="tilt_altitude_I_gain"	value="5.0"/> <!--5.0-->
-		<param name="tilt_altitude_D_gain"	value="8.0"/> <!--8.0-->
+		<param name="tilt_altitude_P_gain"	value="0.5"/> <!--13.0--> 
+		<param name="tilt_altitude_I_gain"	value="3.0"/> <!--5.0-->
+		<param name="tilt_altitude_D_gain"	value="1.5"/> <!--8.0-->
 
 		<!--Tilt Mode Velocity gains-->
-		<param name="tilt_velocity_P_gain"	value="0.5"/> <!-- 0.9 -->
+		<param name="tilt_velocity_P_gain"	value="0.6"/> <!-- 0.9 -->
 		<param name="tilt_velocity_I_gain"	value="0.1"/> <!-- 0.2 -->
 		<param name="tilt_velocity_D_gain"	value="0.1"/> <!-- 0.2 -->
 
