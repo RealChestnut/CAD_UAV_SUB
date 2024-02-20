@@ -21,6 +21,7 @@
 #include <serial/serial.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Empty.h>
+#include <std_msgs/Bool.h>
 #include <string.h>
 #include <string>
 #include <vector>
@@ -29,6 +30,10 @@
 #include <iterator>
 //#include <bits/stdc++.h>
 #include <sstream>
+#include <std_msgs/UInt16.h>
+#include "serial_module/serial_safety_msg.h"
+#include <chrono>
+#include <std_msgs/Float32.h>
 
 using namespace std;
 serial::Serial ser;
@@ -65,6 +70,10 @@ string::size_type Fy_end;
 string::size_type Fz_end;
 string::size_type End;
 
+std::chrono::high_resolution_clock::time_point end_T=std::chrono::high_resolution_clock::now();
+std::chrono::high_resolution_clock::time_point start_T=std::chrono::high_resolution_clock::now();
+std::chrono::duration<double> delta_t;
+std_msgs::Float32 dt;
 
 vector<double> DoubleVec;
 vector<string> last_dump(7);
@@ -74,15 +83,52 @@ void write_callback(const std_msgs::String::ConstPtr& msg){
     ROS_INFO_STREAM("Writing to serial port" << msg->data);
     ser.write(msg->data);
 }
+int switch_data;
+int x_s_dot = 0;
+int x_s = 0;
+int switch_CoF = 0.01;
+void switch_data_callback(const std_msgs::UInt16& msg){
+    //switch_data = msg->data;
+    x_s_dot=-switch_CoF*x_s+static_cast<char>(msg.data);
+  x_s+=x_s_dot*delta_t.count();
+  switch_data =switch_CoF*x_s;
+  if(switch_data==1){ROS_INFO_STREAM(switch_data);}
+   
+}
+
+bool is_Appr=false;
+bool is_Dock=false;
+bool is_Mani=false;
+void zigbee_command_Callback(const std_msgs::Float32MultiArray& msg){
+
+        is_Appr=msg.data[0]; // approching process
+        is_Dock=msg.data[1]; // docking process
+        is_Mani=msg.data[2]; // battery switching process
+                             // if all false? --> sbus command flight
+                             // if Dock mode && after commbined :: flight w.r.t. main drone
+}
+
 
 int open_cnt=0;
 int cnt =0;
+bool init_serial=true;
+bool safety_msg=false;
+
 int main (int argc, char** argv){
     ros::init(argc, argv, "serial_example_node");
     ros::NodeHandle nh;
 
     ros::Subscriber write_sub = nh.subscribe("write", 1000, write_callback);
+    ros::Subscriber switch_data_sub = nh.subscribe("switch_onoff",1,switch_data_callback,ros::TransportHints().tcpNoDelay());
+    ros::Subscriber sub_zigbee_command = nh.subscribe("GUI_command",1,zigbee_command_Callback,ros::TransportHints().tcpNoDelay());
+
     ros::Publisher read_pub_from_main = nh.advertise<std_msgs::Float32MultiArray>("read_serial_magnetic", 1);
+    ros::Publisher serial_safety_from_main = nh.advertise<std_msgs::Bool>("serial_safety_from_main", 1);
+
+    ros::ServiceClient serial_safety_client = nh.serviceClient<serial_module::serial_safety_msg>("serial_safety_msg");
+
+    serial_module::serial_safety_msg srv;
+
 
     try
     {
@@ -104,23 +150,69 @@ int main (int argc, char** argv){
     }else{
         return -1;
     }
-
+    std_msgs::Bool safety_msg_; 
+    int safety_cnt = 0;
+    int safety_cnt_pass=7;
+    int START_cnt =0;
     ros::Rate loop_rate(200);
     while(ros::ok()){
-    cnt ++;
         ros::spinOnce();
 
-	if(ser.available()){
+	end_T=std::chrono::high_resolution_clock::now();
+        delta_t=end_T-start_T;
+        start_T=std::chrono::high_resolution_clock::now();
+       
+        if(switch_data){ser.flush();}	
+	//if(ser.available()){
             //ROS_INFO_STREAM("Reading from serial port");
             
  	    std_msgs::Float32MultiArray result;
 
 	    result.data.resize(topic_num);
 
-		    buffer= ser.read(ser.available());
+	    buffer= ser.read(ser.available());
+	    if(!switch_data){   
+	    if(buffer.find("ABCD")!=string::npos){init_serial=true; ser.write("ABCD"); ROS_INFO_STREAM(buffer);}
 
-	    ROS_INFO_STREAM(buffer);
+	    if(switch_data || !is_Dock){
+                    safety_msg_.data=false;
+		    srv.request.safety_on = false;
+		    serial_safety_client.call(srv);
 
+                    safety_cnt=0;
+                    init_serial=false;}
+
+/*
+	    if(init_serial && (buffer.find("ABCD")!=string::npos))
+	    {
+		    //ROS_INFO("CLEAR");
+		    ser.write("ABCD");
+	    }
+	    */
+	    if((buffer.find("START")!=string::npos) && init_serial)
+	    {
+		    ROS_INFO("START");
+                    safety_msg_.data = true;
+	 	    srv.request.safety_on = true;
+		    serial_safety_client.call(srv);
+
+		    START_cnt ++;
+		    //ROS_INFO_STREAM(START_cnt);
+		    init_serial=false;
+
+	    }
+
+	    //if(buffer.empty()){safety_msg_.data = false;}
+	}
+	
+	   
+	    serial_safety_from_main.publish(safety_msg_);
+	
+	
+	    //ROS_INFO_STREAM(buffer);
+	
+	    //safety_msg_.data = true;
+	    //serial_safety_from_main.publish(safety_msg_);
 	    receive_data(buffer);
 		
 	    	if((last_dump.size()%7==0) && (last_dump.size() !=0) && !last_dump.empty()){
@@ -129,7 +221,7 @@ int main (int argc, char** argv){
 			for(int i =0;i<last_dump.size();i+=topic_num)
 			{
 				for(int j=i; j<i+topic_num; j++){
-				ROS_INFO_STREAM(last_dump[j]);
+				//ROS_INFO_STREAM(last_dump[j]);
 				result.data[j-i]=strtof((last_dump.at(j)).c_str(),nullptr);
 				}
 				read_pub_from_main.publish(result);
@@ -137,10 +229,8 @@ int main (int argc, char** argv){
 			
 	    	}
 		last_dump.clear();
-	    }
+	   // }
 
-	if(!ser.available()){cnt=0;
-	/*ROS_INFO("SYSTEM OUT!!!");*/}
 	loop_rate.sleep();
 	}
 }

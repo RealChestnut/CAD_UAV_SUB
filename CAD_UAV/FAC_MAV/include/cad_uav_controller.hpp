@@ -13,7 +13,16 @@ void main2sub_data_Callback(const std_msgs::Float32MultiArray& msg);
 void main_pose_data_Callback(const std_msgs::Float32MultiArray& msg);
 void sub_pose_data_Callback(const std_msgs::Float32MultiArray& msg);
 void zigbee_command_Callback(const std_msgs::Float32MultiArray& msg);
+bool serial_safety_req_Callback(FAC_MAV::serial_safety_msg::Request &req, 
+		FAC_MAV::serial_safety_msg::Response &res);
 
+
+void kalman_Filtering();
+
+
+void approaching();
+void Manipulating();
+void Docking();
 //////////////////////////////////////////////////////////////////////////
 
 void linear_vel_LPF();
@@ -61,7 +70,7 @@ double l_servo = 0.035; // length from servo motor to propeller
 
 double mass_system =0.0; // system mass (kg) ex) M = main+sub1+sub2
 double mass_main = 7.15; //9.0; // main drone mass(kg) 
-double mass_sub1 = 8.80; // sub1 drone mass (kg)
+double mass_sub1 = 8.7;//8.80; // sub1 drone mass (kg)
 double mass_sub2 = 9.0; // sub2 drone mass (kg)
 
 double r2=sqrt(2); // root(2)
@@ -84,7 +93,7 @@ double rp_limit = 0.25;// roll pitch angle limit (rad)
 double y_vel_limit = 0.01;// yaw angle velocity limit (rad/s)
 double y_d_tangent_deadzone = (double)0.05 * y_vel_limit;//(rad/s)
 double T_limit = 80;// thrust limit (N) :: mass*g
-double altitude_limit = 0.5;// z direction limit (m)
+double altitude_limit = 1.2;// z direction limit (m)
 double XY_limit = 3.0; // position limit
 double XYZ_dot_limit=1; // linear velocity limit
 double XYZ_ddot_limit=2; // linear acceleration limit
@@ -205,7 +214,7 @@ Eigen::MatrixXd Q_T_Z_x(2,1);
 Eigen::MatrixXd Q_T_Z_x_dot(2,1);
 Eigen::MatrixXd Q_T_Z_y(1,1);
 
-double torque_dob_fc = 3.0;
+double torque_dob_fc = 1.0; //origin :: 3.0
 double dhat_tau_r = 0;
 double dhat_tau_p = 0;
 double dhat_tau_y = 0;
@@ -213,6 +222,23 @@ geometry_msgs::Vector3 torque_dhat;
 double tautilde_r_d =0;
 double tautilde_p_d =0;
 double tautilde_y_d =0;
+
+
+////////////// Kalman Filter ////////////////
+Eigen::MatrixXd F(6,6);
+Eigen::MatrixXd P(6,6);
+Eigen::MatrixXd H(3,6);
+Eigen::MatrixXd Q(6,6);
+Eigen::MatrixXd R(3,3);
+Eigen::MatrixXd K(6,3);
+Eigen::VectorXd x(6);
+Eigen::Vector3d z;
+Eigen::MatrixXd predicted_P(6,6);
+Eigen::VectorXd predicted_x(6);
+Eigen::Matrix3d gain_term;
+Eigen::MatrixXd covariance_term;
+geometry_msgs::Vector3 filtered_position;
+geometry_msgs::Vector3 filtered_lin_vel;
 
 
 //////////////////////// TOPIC MESSAGE START //////////////////////
@@ -235,6 +261,8 @@ ros::Subscriber main2sub_data; // main 2 sub data callback
 ros::Subscriber main_pose_data; //main pose data from optitrack
 ros::Subscriber sub_pose_data; // sub pose data from optitrack
 ros::Subscriber sub_zigbee_command; // sub command data from zigbee
+ros::Subscriber serial_safety_from_main; // docking safety command from main
+
 //////////////////////// PUBLISHER START /////////////////////////
 
 ros::Publisher PWMs; // PWM data logging
@@ -268,6 +296,11 @@ ros::Publisher delta_time;
 
 ros::Publisher kill_switch;
 ros::Publisher ToSubAgent;
+
+//////////////////////////////SERVER START////////////////////////////////////////
+
+
+ros::ServiceServer serial_safety_server;
 
 ///////////////////////////////CALLBACK FUNCTION DATA//////////////////////////////////////
 void Clock()
@@ -392,7 +425,7 @@ int button_limit=10; // button count limit
 
 int cnt_switching=0; // mono -> combined || combined -> mono :: for distinguish
 double time_switching=0; // 
-int time_limit_switching=2; // 
+int time_limit_switching=5; // 
 int servo_angle=0;
 void shape_detector()
 {
@@ -414,26 +447,34 @@ void shape_detector()
 	  button_cnt++;
   }
   if(button_cnt<0){button_cnt=0;}
-  if(button_cnt>button_limit){button_cnt=button_limit;}
-  
-  if(button_cnt==button_limit){// we define that this state is combined
-	  mono_flight = false;
+  //if(button_cnt>(50*button_limit)){button_cnt=(50*button_limit);}
+  if(button_cnt>(button_limit)){button_cnt=(button_limit);}
+ 
+ //if((button_cnt==button_limit) && is_Dock) 
+  if((button_cnt==button_limit) && is_Dock ){// we define that this state is combined
+	  //mono_flight = false;
   	  module_num=2;
 	  
-	  servo_angle=map<int16_t>(90,0,180, 1000, 2000);//70 :: main 왼쪽위 기준
+	  servo_angle=map<int16_t>(120,0,180, 2000, 1000);
 
-	  //ROS_INFO("COMBINED!!!!!!!!!!!");
-  	  //main_agent=false; for sub drone
-	  } 
-  else{ // we define that this state is disassembled
-  	  mono_flight = true;
-  	  module_num=1;
-	  servo_angle=map<int16_t>(0,0,180, 1000, 2000);//150 :: main 왼쪽위
-	  //ROS_INFO("MONO_FLIGHT!!!!!!!!!");
-  	  //main_agent=true; for sub drone
+	  ROS_INFO("COMBINED!!!!!!!!!!!");
+  	  //main_agent=false; //for sub drone
 	  }
-  //mono_flight=true;
-  //module_num=1;
+
+  //else{
+   if(/* (button_cnt==(50*button_limit)) &&*/ main_agent){ // we define that this state is disassembled
+  	  //mono_flight = true;
+  	  module_num=1;
+	  //servo_angle=map<int16_t>(0,0,180, 2000, 1000);
+	  ROS_INFO("MONO_FLIGHT!!!!!!!!!");
+	  //cnt_switching =1; 
+  	  //main_agent=true; //for sub drone
+	  }
+
+   //ROS_INFO_STREAM(main_agent);
+   //ROS_INFO("---");
+   //ROS_INFO_STREAM(mono_flight);
+  
 
    
 
@@ -540,8 +581,8 @@ void UpdateParameter(int num)
 
   if(num==1){
               //main drone parameter //
-              CoM_hat.x = -0.002;
-              CoM_hat.y =  0.021;
+	      CoM_hat.x = -0.0;
+              CoM_hat.y = 0.001;// 0.035;
               CoM_hat.z = -0.065;
 		
               Jxx = 1.23;
@@ -609,7 +650,7 @@ void UpdateParameter(int num)
 
   /////////////////  reset data when drones are switching ///////////////////////
   
-  
+  /*
   if(cnt_switching==1){if(mono_flight){
                 }
   e_r_i = 0;//roll error integration
@@ -617,10 +658,10 @@ void UpdateParameter(int num)
   e_y_i = 0;//yaw error integration
   e_X_i = 0;//X position error integration
   e_Y_i = 0;//Y position error integration
-  e_Z_i = 0;//Z position error integration
+  //e_Z_i = 0;//Z position error integration
   e_X_dot_i = 0;//X velocity error integration
   e_Y_dot_i = 0;//Y velocity error integration
-  e_Z_dot_i = 0;//Z velocity error integration
+  //e_Z_dot_i = 0;//Z velocity error integration
   tau_y_th_integ = 0;//tau yaw servo integration
   
   
@@ -630,7 +671,7 @@ void UpdateParameter(int num)
   dhat_tau_y = 0;
   tautilde_r_d =0;
   tautilde_p_d =0;
-  tautilde_y_d =0;}
+  tautilde_y_d =0;}*/
   
 }
 
@@ -638,16 +679,26 @@ void UpdateParameter(int num)
 void Switching_safety(){
   
   //switching_safety_start//
-  if(cnt_switching==0){if(!mono_flight){cnt_switching=1;}}
-  if(cnt_switching==1){if(mono_flight){
+  if(cnt_switching==0){if(is_Dock){cnt_switching=1;}}
+  if(cnt_switching==1){if(!is_Dock){
           /* switching safety process  */
           // Fxyd limit || accel_limit //
-          F_xd_limit=mass_system*0.5; //acc limit 1m/s^2
-          F_yd_limit=mass_system*0.5;
+          F_xd_limit=mass_system*4; //acc limit 1m/s^2
+          F_yd_limit=mass_system*4;
+	  XYZ_dot_limit=2;
+          XYZ_ddot_limit=4;
+	  servo_angle=map<int16_t>(0,0,180, 2000, 1000);
+	  button_cnt=0; //23.12.28
           time_switching+=delta_t.count();}}
   if(time_switching>time_limit_switching){
           cnt_switching=0;
-          time_switching=0;}
+	  F_xd_limit=mass_system*2; //acc limit 1m/s^2
+          F_yd_limit=mass_system*2;
+          XYZ_dot_limit=1;
+          XYZ_ddot_limit=2;
+	  button_cnt=0; //23.12.28
+          servo_angle=map<int16_t>(0,0,180, 2000, 1000);
+	  time_switching=0;}
   //switching_safety_end//
 
 }
@@ -694,15 +745,19 @@ double swap_dynamixel_vel_limit = 0.01;
 double swap_dynamixel_angle=0.0;
 double swap_dynamixel_ang_d=servo_theta(4); // 다이나믹셀 초기값으로 초기화
 /////////////////////////////////
+double cnt_deltaPy=0;
+double cnt_deltaPy_limit=3;
+
 void Command_Generator()
 {
 
+	kalman_Filtering();
   
   ////////////////////////////////////// SBUS COMMAND //////////////////////////////////////////////
   
   //-------------------------------------angle command-------------------------------------------//
 
-  if(true/*sbus_mode*/)
+  if(!is_Appr && !is_Dock)//
   {
     /////////// angle command /////////////
     //if subdrone? yaw command --> battery swap, dynamixel input || 23.10.19 -- 임시코드 나중에 수정
@@ -732,34 +787,53 @@ void Command_Generator()
   }
   ////////////////////////////////////////////////////////////////////////////////////////////////
   
+  approaching();
 
+  Manipulating();
+  
+  Docking();
+  if(cnt_switching==1){rpy_desired.x=-0.0349;}
+
+
+}
 
 
   
   ////////////////////////////////// GROUND STATION COMMAND /////////////////////////////////////
-
-  double deltaPx = (main_position_opti_new.x-sub_position_opti.x);
-  double deltaPy = (main_position_opti_new.y-sub_position_opti.y);
-  double deltaPz = (main_position_opti_new.z-sub_position_opti.z);
-
+void approaching(){
+  double deltaPx = (main_position_opti_new.x-sub_position_opti_new.x);
+  double deltaPy = (main_position_opti_new.y-sub_position_opti_new.y);
+  double deltaPz = (main_position_opti_new.z-sub_position_opti_new.z);
+  double delta_Roll = (main_attitude_opti.x-sub_attitude_opti.x);
+  double delta_Pitch = (main_attitude_opti.y-sub_attitude_opti.y);
+  double delta_Yaw = (main_attitude_opti.z-sub_attitude_opti.z);
+  /*
+  ROS_INFO_STREAM(deltaPx);
+  ROS_INFO_STREAM(deltaPy);
+  ROS_INFO_STREAM(deltaPz);
+  ROS_INFO_STREAM(delta_Roll);
+  ROS_INFO_STREAM(delta_Pitch);
+  ROS_INFO_STREAM(delta_Yaw);
+  */
+  if(!is_Appr){cnt_deltaPy = 0;}
   if(is_Appr)
   {
     ///////////////////////////////////// IF MAIN DRONE ///////////////////////////////////
 	/*
     // 기존 조종기 명령을 따르도록
-    rpy_desired.x = 0.0; 
+    rpy_desired.x = 0.0;
     rpy_desired.y = 0.0;
     rpy_desired.z = 0.0;
 
     XYZ_desired.x = XYZ_desired_base.x - XY_limit*(((double)Sbus[1]-(double)1500)/(double)500);
     XYZ_desired.y = XYZ_desired_base.y + XY_limit*(((double)Sbus[3]-(double)1500)/(double)500); //for sub drone :: Sbus[0]
 
-    if(altitude_mode){ 
+    if(altitude_mode){
       if(Sbus[2]>1800){
         XYZ_desired.z-=0.0005;}
       else if(Sbus[2]<1200){
         XYZ_desired.z+=0.0005;}
-        
+
       if(XYZ_desired.z <-altitude_limit) XYZ_desired.z=-altitude_limit;
       if(XYZ_desired.z > 0) XYZ_desired.z=0;}
     else{
@@ -767,30 +841,40 @@ void Command_Generator()
 
 	*/
     //////////////////////////////////// IF SUb DRONE //////////////////////////////////////
-    
-    rpy_desired.x = 0.0; 
+    cnt_deltaPy += 0.001;
+    if(cnt_deltaPy > 1){cnt_deltaPy =1;}
+    //ROS_INFO_STREAM(cnt_deltaPy);
+
+    rpy_desired.x = 0.0;
     rpy_desired.y = 0.0;
     rpy_desired.z = 0.0;
     // X position의 경우 자기 위치에서 deltaP(main_posi-sub_posi)만큼 추가로 이동 하는 명령
     // delta P가 abs(P)=0.005 이라면 자기 위치 고수
-    XYZ_desired.x = XYZ_desired_base.x + deltaPx;
-    if(deltaPx <= 0.005) XYZ_desired.x = sub_position_opti.x;
-    if(deltaPx > -0.005) XYZ_desired.x = sub_position_opti.x;
-    
+    XYZ_desired.x = sub_position_opti_new.x + deltaPx;
+    if((deltaPx <= 0.005) && (deltaPx > -0.005)) XYZ_desired.x = sub_position_opti_new.x;
+
     // Y position의 경우 자기 위치에서 deltaP(main_posi-sub_posi)만큼 추가로 이동하고 +10cm간격 유지하는 명령
-    // deltaP가 abs(P)<=0.1이라면 자기 위치 고수
-    XYZ_desired.y = XYZ_desired_base.y + deltaPy;
-    if(deltaPy<=0.11) XYZ_desired.y = sub_position_opti.y;
-    if(deltaPy>0.09) XYZ_desired.y = sub_position_opti.y;
-    if(deltaPy<=0.09) XYZ_desired.y = sub_position_opti.y-(0.1-deltaPy);
+    // deltaP가 abs(P)<=0.2이라면 자기 위치 고수
+    if((cnt_deltaPy*(main_position_opti_new.y-0.25))>XYZ_desired_base.y){XYZ_desired.y = cnt_deltaPy*(main_position_opti_new.y-0.25);}
+    
+    
 
+    //if((deltaPy<=0.11)&& (deltaPy>0.095)) XYZ_desired.y = sub_position_opti_new.y;
 
-    XYZ_desired.z =  sub_position_opti.z + deltaPz;
+    XYZ_desired.z =  sub_position_opti_new.z + deltaPz;
 
     if(XYZ_desired.z <-altitude_limit) XYZ_desired.z=-altitude_limit;
     if(XYZ_desired.z > 0) XYZ_desired.z=0;
   }
+}
+void Manipulating(){
 
+	double deltaPx = (main_position_opti_new.x-sub_position_opti_new.x);
+  double deltaPy = (main_position_opti_new.y-sub_position_opti_new.y);
+  double deltaPz = (main_position_opti_new.z-sub_position_opti_new.z);
+  double delta_Roll = (main_attitude_opti.x-sub_attitude_opti.x);
+  double delta_Pitch = (main_attitude_opti.y-sub_attitude_opti.y);
+  double delta_Yaw = (main_attitude_opti.z-sub_attitude_opti.z);
   if(is_Mani)
   {
     /*
@@ -803,10 +887,17 @@ void Command_Generator()
     */
   }
   //if(!is_Mani){DOB_mode=false;}
+  }
 
 
-  
+void Docking(){
 
+	double deltaPx = (main_position_opti_new.x-sub_position_opti_new.x);
+  double deltaPy = (main_position_opti_new.y-sub_position_opti_new.y);
+  double deltaPz = (main_position_opti_new.z-sub_position_opti_new.z);
+  double delta_Roll = (main_attitude_opti.x-sub_attitude_opti.x);
+  double delta_Pitch = (main_attitude_opti.y-sub_attitude_opti.y);
+  double delta_Yaw = (main_attitude_opti.z-sub_attitude_opti.z);
   if(is_Dock)
   {
 
@@ -814,52 +905,55 @@ void Command_Generator()
 
     // 기존 조종기 명령을 따르도록
     /*
-    rpy_desired.x = 0.0; 
+    rpy_desired.x = 0.0;
     rpy_desired.y = 0.0;
     rpy_desired.z = 0.0;
 
     XYZ_desired.x = XYZ_desired_base.x - XY_limit*(((double)Sbus[1]-(double)1500)/(double)500);
     XYZ_desired.y = XYZ_desired_base.y + XY_limit*(((double)Sbus[3]-(double)1500)/(double)500); //for sub drone :: Sbus[0]
 
-    if(altitude_mode){ 
+    if(altitude_mode){
       if(Sbus[2]>1800){
         XYZ_desired.z-=0.0005;}
       else if(Sbus[2]<1200){
         XYZ_desired.z+=0.0005;}
-        
+
       if(XYZ_desired.z <-altitude_limit) XYZ_desired.z=-altitude_limit;
       if(XYZ_desired.z > 0) XYZ_desired.z=0;}
     else{
 		T_d = -T_limit*(((double)Sbus[2]-(double)1500)/(double)500)-T_limit;}
 	*/
     //////////////////////////////////// IF SUB DRONE //////////////////////////////////////
-    
-    rpy_desired.x = 0.0; 
+
+    rpy_desired.x = 0.0;
     rpy_desired.y = 0.0;
     rpy_desired.z = 0.0;
     // X position의 경우 자기 위치에서 deltaP(main_posi-sub_posi)만큼 추가로 이동 하는 명령
     // delta P가 abs(P)=0.005 이라면 자기 위치 고수
-    XYZ_desired.x = XYZ_desired_base.x + deltaPx;
-    if(deltaPx <= 0.005) XYZ_desired.x = sub_position_opti.x;
-    if(deltaPx > -0.005) XYZ_desired.x = sub_position_opti.x;
-    
+
+    XYZ_desired.x = sub_position_opti_new.x + deltaPx;
+    if((deltaPx <= 0.005) && (deltaPx > -0.005)){ XYZ_desired.x = sub_position_opti_new.x;}
+
     // Y position의 경우 자기 위치에서 deltaP(main_posi-sub_posi)만큼 추가로 이동하고 +10cm간격 유지하는 명령
     // deltaP가 abs(P)<=0.1이라면 자기 위치 고수
-    XYZ_desired.y = XYZ_desired_base.y + deltaPy; //docking 하면 계속 돌진
-    if(deltaPy<=0.001) XYZ_desired.y = sub_position_opti.y-(0.1-deltaPy); //혹시 결합 안될때를 대비함
-    XYZ_desired.z =  sub_position_opti.z + deltaPz;
+    
+//if(main_attitude_opti.z - sub_attitude_opti.z)<=)
+    XYZ_desired.y = sub_position_opti_new.y + deltaPy; //docking 하면 계속 돌진
+    if(deltaPy<=0.001) XYZ_desired.y = sub_position_opti_new.y-(0.1-deltaPy); //혹시 결합 안될때를 대비함
+    
+    XYZ_desired.z = sub_position_opti_new.z + deltaPz;
 
     if(XYZ_desired.z <-altitude_limit) XYZ_desired.z=-altitude_limit;
     if(XYZ_desired.z > 0) XYZ_desired.z=0;
 
   }
-
+}
   // 만약 1초안에 is Dock이 true가 됐는데 결합이 안될경우 독립 비행모드로 전환 후 랜딩
 
-  
+
 
  ///////////////////////////////////////////////////////////////////////////////////////////
-}
+
 
 ////////////////////Attitude Controller///////////////////////
 
@@ -873,7 +967,7 @@ Eigen::Vector3d tau_cmd(3);
 Eigen::Vector3d rpy_ddot_cmd(3);
 void attitude_controller()
 {
-  
+
   e_r = rpy_desired.x - imu_rpy.x;
   e_p = rpy_desired.y - imu_rpy.y;
   e_y = rpy_desired.z - imu_rpy.z;
@@ -886,16 +980,16 @@ void attitude_controller()
   e_y_i += e_y * delta_t.count();
         if (fabs(e_y_i) > integ_yaw_limit) e_y_i = (e_y_i / fabs(e_y_i)) * integ_yaw_limit;
 
-	
+
   rpy_ddot_d.x = Par* e_r + Iar * e_r_i + Dar * (-imu_ang_vel.x);//- (double)0.48;
-  rpy_ddot_d.y = Pap * e_p + Iap * e_p_i + Dap * (-imu_ang_vel.y);//+ (double)0.18; 
+  rpy_ddot_d.y = Pap * e_p + Iap * e_p_i + Dap * (-imu_ang_vel.y);//+ (double)0.18;
   rpy_ddot_d.z = Py * e_y + Dy * (-imu_ang_vel.z);
 
-	
+
   rpy_ddot_cmd << rpy_ddot_d.x, rpy_ddot_d.y, rpy_ddot_d.z;
 
   //tau_cmd = hat_MoI*rpy_ddot_cmd; // Calculate tau rpy
- 
+
   if(!mono_flight){
         tau_rpy_desired.x = Jxx*rpy_ddot_cmd(0);
         tau_rpy_desired.y = Jyy*rpy_ddot_cmd(1);
@@ -905,11 +999,16 @@ void attitude_controller()
         tau_rpy_desired.x = rpy_ddot_cmd(0);
         tau_rpy_desired.y = rpy_ddot_cmd(1);
         tau_rpy_desired.z = rpy_ddot_cmd(2);
-  
+
   }
 
+  if(Sbus[6]<1500){tau_rpy_desired.x+=-5;}
 
-  
+
+
+
+
+
 
 }
 
@@ -917,11 +1016,11 @@ void attitude_controller()
 
 void torque_DOB()
 {
-  
+
   double tau_r=tau_rpy_desired.x;
   double tau_p=tau_rpy_desired.y;
   double tau_y=tau_rpy_desired.z;
-  
+
   //------------------Torque DoB Q filter----------------------
   Q_T_A << -r2*torque_dob_fc, -pow(torque_dob_fc,2),
                           1.0,                   0.0;
@@ -935,8 +1034,8 @@ void torque_DOB()
 
   MinvQ_T_B << 1.0, 0.0;
 
-  MinvQ_T_C_x << (Jxx*0.001)*pow(torque_dob_fc,2),                                0.0;
-  MinvQ_T_C_y << (Jyy*0.001)*pow(torque_dob_fc,2),                                0.0;
+  MinvQ_T_C_x << (Jxx*0.1)*pow(torque_dob_fc,2),                                0.0;
+  MinvQ_T_C_y << (Jyy*0.1)*pow(torque_dob_fc,2),                                0.0;
   MinvQ_T_C_z << (Jzz*0.001)*pow(torque_dob_fc,2),                                0.0;
 
 
@@ -944,7 +1043,7 @@ void torque_DOB()
   MinvQ_T_X_x_dot=MinvQ_T_A*MinvQ_T_X_x+MinvQ_T_B*imu_ang_vel.x;
 	MinvQ_T_X_x+=MinvQ_T_X_x_dot*delta_t.count();
 	MinvQ_T_X_y=MinvQ_T_C_x*MinvQ_T_X_x;
-	
+
 	Q_T_X_x_dot=Q_T_A*Q_T_X_x+Q_T_B*tautilde_r_d;
 	Q_T_X_x+=Q_T_X_x_dot*delta_t.count();
 	Q_T_X_y=Q_T_C*Q_T_X_x;
@@ -954,7 +1053,7 @@ void torque_DOB()
 	MinvQ_T_Y_x_dot=MinvQ_T_A*MinvQ_T_Y_x+MinvQ_T_B*imu_ang_vel.y;
 	MinvQ_T_Y_x+=MinvQ_T_Y_x_dot*delta_t.count();
 	MinvQ_T_Y_y=MinvQ_T_C_y*MinvQ_T_Y_x;
-	
+
 	Q_T_Y_x_dot=Q_T_A*Q_T_Y_x+Q_T_B*tautilde_p_d;
 	Q_T_Y_x+=Q_T_Y_x_dot*delta_t.count();
 	Q_T_Y_y=Q_T_C*Q_T_Y_x;
@@ -997,6 +1096,7 @@ void position_controller()
 
   e_X = XYZ_desired.x - position_from_t265.x;
   e_Y = XYZ_desired.y - position_from_t265.y;
+
   e_X_i += e_X * delta_t.count();
   if (fabs(e_X_i) > position_integ_limit) e_X_i = (e_X_i / fabs(e_X_i)) * position_integ_limit;
   e_Y_i += e_Y * delta_t.count();
@@ -1004,8 +1104,11 @@ void position_controller()
 
   XYZ_dot_desired.x = Pp * e_X + Ip * e_X_i - Dp * lin_vel.x;
   XYZ_dot_desired.y = Pp * e_Y + Ip * e_Y_i - Dp * lin_vel.y;
+
+
   if(fabs(XYZ_dot_desired.x) > XYZ_dot_limit) XYZ_dot_desired.x = (XYZ_dot_desired.x/fabs(XYZ_dot_desired.x))*XYZ_dot_limit;
   if(fabs(XYZ_dot_desired.y) > XYZ_dot_limit) XYZ_dot_desired.y = (XYZ_dot_desired.y/fabs(XYZ_dot_desired.y))*XYZ_dot_limit;
+
 
   lin_vel_desired.x = XYZ_dot_desired.x;
   lin_vel_desired.y = XYZ_dot_desired.y;
@@ -1095,7 +1198,7 @@ void altitude_controller()
   
   if(!altitude_mode) F_zd=T_d;     
   //else F_xyzd.z = mass_system*(XYZ_ddot_desired.z);
-  if(F_zd > -0.5*mass_system*g) F_zd = -0.5*mass_system*g;
+  if(F_zd > -0.5*mass_system*g) {F_zd = -0.5*mass_system*g;/*ROS_INFO("IM LOW");*/ }
   if(F_zd <= -1.7*mass_system*g) F_zd = -1.7*mass_system*g;
 
 
@@ -1210,6 +1313,7 @@ void wrench_allocation()
 
 std_msgs::Float32MultiArray distributed_yaw_torque; // 23.10.05
 double tau_y_d=0.0;
+double tau_y_integ_limit =0.3;
 void yaw_torque_distribute()
 {
 
@@ -1243,9 +1347,9 @@ void yaw_torque_distribute()
   }
 
   tau_y_th_integ+=(1*tau_rpy_desired.z);
-  if(fabs(tau_y_th_integ) > tau_y_limit)
+  if(fabs(tau_y_th_integ) > tau_y_integ_limit)
   {
-	 tau_y_th_integ = (tau_y_th_integ/fabs(tau_y_th_integ))*tau_y_limit; 
+	 tau_y_th_integ = (tau_y_th_integ/fabs(tau_y_th_integ))*tau_y_integ_limit; 
   }
 
   distributed_yaw_torque.data[0]= tau_y_non_sat; //23.10.05
@@ -1338,7 +1442,7 @@ double x_th1 = 0;
 double x_th2 = 0;
 double x_th3 = 0;
 double x_th4 = 0;
-double th_cut_off_freq = 10.0;
+double th_cut_off_freq = 30.0; // origin :: 5
 
 Eigen::VectorXd servo_LPF(4);
 
@@ -1424,13 +1528,16 @@ void PWM_signal_Generator()
   if(fabs(servo_command4)>hardware_servo_limit) servo_command4 = (servo_command4/fabs(servo_command4))*hardware_servo_limit;
   
 
-  /*
+  
   if(!main_agent && !mono_flight){ /// 서브드론의 경우 Sbus[3]를 다이나믹셀 position desired input으로 사용
 
         swap_dynamixel_angle  = 0.01*(((float)Sbus[3]-(float)1500)/(float)500); // angle data generate
         swap_dynamixel_ang_d += swap_dynamixel_angle;
+	//ROS_INFO_STREAM(Sbus[3]);
+	//ROS_INFO_STREAM(swap_dynamixel_ang_d);
+	//ROS_INFO_STREAM(swap_dynamixel_angle);
 	}
-  */
+  
   //pwm_Kill();
   pwm_Command(Force_to_PWM(F1),Force_to_PWM(F2), Force_to_PWM(F3), Force_to_PWM(F4),servo_angle,servo_angle);
   Force_prop.data[0]=F1;
@@ -1444,7 +1551,7 @@ void PWM_signal_Generator()
 void reset_data()
 {
 
-  rpy_desired.z=sub_attitude_opti.z;//t265_att.z;     //[J]This line ensures that yaw desired right after disabling the kill switch becomes current yaw attitude
+  rpy_desired.z=sub_attitude_opti.z; //sub_attitude_opti.z t265_att.z    //[J]This line ensures that yaw desired right after disabling the kill switch becomes current yaw attitude
 
   XYZ_desired_base.x=position_from_t265.x;
   XYZ_desired_base.y=position_from_t265.y;
@@ -1492,6 +1599,7 @@ void reset_data()
   swap_dynamixel_ang_d=servo_theta(4);
 
   tau_y_th=0;
+  servo_angle=map<int16_t>(0,0,180, 2000, 1000);
 }
 
 int cnt_for_servo=0;
@@ -1539,6 +1647,8 @@ void PublishData()
   prev_ang_vel = imu_ang_vel;
   prev_lin_vel = lin_vel;
 
+  sub_position_opti_prev = sub_position_opti_new;
+
   cnt_for_servo++; //23.11.03
 
 }
@@ -1560,7 +1670,9 @@ void jointstate_Callback(const sensor_msgs::JointState& msg)
   
 
 //IMU DATA CALLBACK//
-
+double lin_vel_X = 0;
+double lin_vel_Y = 0;
+double lin_vel_Z = 0;
 void imu_Callback(const sensor_msgs::Imu& msg)
 {
     // TP attitude - Quaternion representation
@@ -1574,7 +1686,7 @@ void imu_Callback(const sensor_msgs::Imu& msg)
     // TP attitude - Euler representation
     tf::Matrix3x3(quat).getRPY(imu_rpy.x,imu_rpy.y,imu_rpy.z);
     
-    /*
+  /*  
     base_yaw = t265_yaw_angle;
     if(base_yaw - yaw_prev < -pi) yaw_rotate_count++;
     else if(base_yaw - yaw_prev > pi) yaw_rotate_count--;
@@ -1584,6 +1696,9 @@ void imu_Callback(const sensor_msgs::Imu& msg)
     yaw_prev = base_yaw;
 */
     imu_rpy.z = sub_attitude_opti.z;
+
+
+
 	
 }
 
@@ -1626,10 +1741,18 @@ void t265_Odom_Callback(const nav_msgs::Odometry::ConstPtr& msg)
     double global_X_dot = v(2)*(sin(imu_rpy.x)*sin(imu_rpy.z)+cos(imu_rpy.x)*cos(imu_rpy.z)*sin(imu_rpy.y))-v(1)*(cos(imu_rpy.x)*sin(imu_rpy.z)-cos(imu_rpy.z)*sin(imu_rpy.x)*sin(imu_rpy.y))+v(0)*cos(imu_rpy.z)*cos(imu_rpy.y);
     double global_Y_dot = v(1)*(cos(imu_rpy.x)*cos(imu_rpy.z)+sin(imu_rpy.x)*sin(imu_rpy.z)*sin(imu_rpy.y))-v(2)*(cos(imu_rpy.z)*sin(imu_rpy.x)-cos(imu_rpy.x)*sin(imu_rpy.z)*sin(imu_rpy.y))+v(0)*cos(imu_rpy.y)*sin(imu_rpy.z);
     double global_Z_dot = -v(0)*sin(imu_rpy.y)+v(2)*cos(imu_rpy.x)*cos(imu_rpy.y)+v(1)*cos(imu_rpy.y)*sin(imu_rpy.x);
-
+  
+    
+    lin_vel_opti.x=global_X_dot;
+    lin_vel_opti.y=global_Y_dot;
+    lin_vel_opti.z=global_Z_dot;
+	
+   /* 
     lin_vel.x=global_X_dot;
     lin_vel.y=global_Y_dot;
     lin_vel.z=global_Z_dot;
+    */
+    
 }
 
 
@@ -1650,10 +1773,10 @@ void sbus_Callback(const std_msgs::Int16MultiArray::ConstPtr& array)
         kill_mode=true;}
       else {
         kill_mode=false;}
-  //if(main_agent && mono_flight){ if sub drone
+  if(main_agent && mono_flight){ //if sub drone
       if(Sbus[5]>1500) altitude_mode=true;
       else altitude_mode=false;
-
+/*
       if(Sbus[6]<1300){
         attitude_mode=true;
         velocity_mode=false;
@@ -1666,12 +1789,12 @@ void sbus_Callback(const std_msgs::Int16MultiArray::ConstPtr& array)
         attitude_mode=false;
         velocity_mode=false;
         position_mode=true;}
-
+*/
       if(Sbus[7]>1500){
 	DOB_mode=true;}
       else{
 	DOB_mode=false;}
-    //}
+    }
       }
  
 }
@@ -1727,10 +1850,16 @@ double Force_to_PWM(double F){
 
 // ARDUINO SWITCH DATA CALLBACK //
 
-
+int x_s_dot = 0;
+int x_s = 0;
+int switch_CoF = 0.01;
 void switch_Callback(const std_msgs::UInt16& msg)
 {
-  switch_toggle_from_ardu=static_cast<char>(msg.data);
+
+  x_s_dot=-switch_CoF*x_x+static_cast<char>(msg.data);
+  x_s+=x_s_dot*delta_t.count();
+  switch_toggle_from_ardu =switch_CoF*x_s;
+ 
 }
 
 // wrench allocation data(torque, force) && kill_switch command from main //
@@ -1811,7 +1940,8 @@ void sub_pose_data_Callback(const std_msgs::Float32MultiArray& msg){
 	position_from_t265.x = msg.data[0];
         position_from_t265.y = msg.data[1];
         position_from_t265.z = msg.data[2];
-
+	
+		
 	if((sub_position_opti_new.x - sub_position_opti_prev.x)!=0){
         lin_vel_opti.x = (sub_position_opti_new.x - sub_position_opti_prev.x)/delta_t.count();
         lin_vel_opti.y = (sub_position_opti_new.y - sub_position_opti_prev.y)/delta_t.count();
@@ -1832,23 +1962,58 @@ void sub_pose_data_Callback(const std_msgs::Float32MultiArray& msg){
 
 
         // global axis :: linear velocity
-
+/*
     lin_vel.x=lin_vel_LPF(0);//lin_vel_opti.x;
     lin_vel.y=lin_vel_LPF(1);//lin_vel_opti.y;
-    lin_vel.z=lin_vel_LPF(2);//lin_vel_opti.z;
-
-	/*
+    lin_vel.z=lin_vel_LPF(2);
+    
+*/
+/*	
     lin_vel_opti_LPF.x=lin_vel_LPF(0);
     lin_vel_opti_LPF.y=lin_vel_LPF(1);
     lin_vel_opti_LPF.z=lin_vel_LPF(2);
+*/
+
+	kalman_Filtering();
+
+}
+
+void kalman_Filtering(){
+	z << sub_position_opti_new.x,sub_position_opti_new.y,sub_position_opti_new.z;
+	predicted_x = F*x;
+	predicted_P = F*P*F.transpose()+Q;
+	gain_term = H*predicted_P*H.transpose()+R;
+	K=predicted_P*H.transpose()*gain_term.inverse();
+	x=predicted_x+K*(z-H*predicted_x);
+	covariance_term = Eigen::MatrixXd::Identity(6,6)-K*H;
+	P=covariance_term*predicted_P*covariance_term.transpose()+K*R*K.transpose();
+	filtered_position.x=x(0);
+	filtered_position.y=x(1);
+	filtered_position.z=x(2);
+	filtered_lin_vel.x=x(3);
+	filtered_lin_vel.y=x(4);
+	filtered_lin_vel.z=x(5);
+
+	lin_vel.x = x(3);
+	lin_vel.y = x(4);
+	lin_vel.z = x(5);
+
+	/*
+	lin_vel_opti_LPF.x =x(3);
+	lin_vel_opti_LPF.y =x(4);
+	lin_vel_opti_LPF.z =x(5);
 	*/
-    sub_position_opti_prev.x = sub_position_opti_new.x;
-    sub_position_opti_prev.y = sub_position_opti_new.y;
-    sub_position_opti_prev.z = sub_position_opti_new.z;
 
-
-
-
+/*
+    ROS_INFO("---Predicted Position---");
+    ROS_INFO_STREAM(filtered_position.x);
+    ROS_INFO_STREAM(filtered_position.y);
+    ROS_INFO_STREAM(filtered_position.z);
+    ROS_INFO("---Predicted Velocity---");
+    ROS_INFO_STREAM(filtered_lin_vel.x);
+    ROS_INFO_STREAM(filtered_lin_vel.y);
+    ROS_INFO_STREAM(filtered_lin_vel.z);
+    */
 }
 
 /////////////////// ZIGBEE COMMAND CALLBACK ///////////////////////
@@ -1862,4 +2027,25 @@ void zigbee_command_Callback(const std_msgs::Float32MultiArray& msg){
                              // if Dock mode && after commbined :: flight w.r.t. main drone
 }
 
+void serial_safety_msg_Callback(const std_msgs::Bool& msg){
+        
+	
 
+}
+
+bool serial_safety_req_Callback(FAC_MAV::serial_safety_msg::Request &req, 
+  		                      FAC_MAV::serial_safety_msg::Response &res){
+	if(req.safety_on){
+	mono_flight = false; 
+	main_agent =  false;
+	ROS_INFO("SERVICE CALLBACK ON");
+	}
+	else{
+	
+	mono_flight = true;
+        main_agent =  true;
+	ROS_INFO("SERVICE CALLBACK OFF");
+
+	}
+	return true;
+}

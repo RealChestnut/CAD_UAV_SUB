@@ -54,6 +54,16 @@ int main(int argc, char **argv)
 
   //initialize ros node//
   //initSubscriber();
+  //
+    //Kalman initialization-------------------------------------
+		x << 0, 0, 0, 0, 0, 0;
+		P << Eigen::MatrixXd::Identity(6,6);
+		F << Eigen::MatrixXd::Identity(3,3), 0.005*Eigen::MatrixXd::Identity(3,3),
+		     Eigen::MatrixXd::Zero(3,3), Eigen::MatrixXd::Identity(3,3);
+		H << Eigen::MatrixXd::Identity(3,3), Eigen::MatrixXd::Zero(3,3);
+		Q << Eigen::MatrixXd::Identity(3,3), Eigen::MatrixXd::Zero(3,3),
+		     Eigen::MatrixXd::Zero(3,3), 1500.*Eigen::MatrixXd::Identity(3,3);
+		R << 0.005*Eigen::MatrixXd::Identity(3,3);
 
     /////////////////////////////////////////////////SUBSCFRIBER START//////////////////////////////////////////////////////
     dynamixel_state = nh.subscribe("joint_states",1,jointstate_Callback, ros::TransportHints().tcpNoDelay()); // servo angle data from dynamixel
@@ -63,15 +73,16 @@ int main(int argc, char **argv)
     Switch_checker = nh.subscribe("switch_onoff",1,switch_Callback,ros::TransportHints().tcpNoDelay()); // switch interrupt from arduino
 
 //    t265_position=nh.subscribe("/t265_pos",1,t265_position_Callback,ros::TransportHints().tcpNoDelay()); // position data from t265
-//    t265_rotation=nh.subscribe("/t265_rot",1,t265_rotation_Callback,ros::TransportHints().tcpNoDelay()); // angle data from t265
+    t265_rotation=nh.subscribe("/t265_rot",1,t265_rotation_Callback,ros::TransportHints().tcpNoDelay()); // angle data from t265
 
-//    t265_odom=nh.subscribe("/rs_t265/odom/sample",1,t265_Odom_Callback,ros::TransportHints().tcpNoDelay()); // odometry data from t265
+    t265_odom=nh.subscribe("/rs_t265/odom/sample",1,t265_Odom_Callback,ros::TransportHints().tcpNoDelay()); // odometry data from t265
 
     main2sub_data = nh.subscribe("read_serial_magnetic",1,main2sub_data_Callback,ros::TransportHints().tcpNoDelay()); // wrench data subscribe
 
     main_pose_data = nh.subscribe("opti_MAIN_pose",1,main_pose_data_Callback,ros::TransportHints().tcpNoDelay());
     sub_pose_data = nh.subscribe("opti_SUB_pose",1,sub_pose_data_Callback,ros::TransportHints().tcpNoDelay());
     sub_zigbee_command = nh.subscribe("GUI_command",1,zigbee_command_Callback,ros::TransportHints().tcpNoDelay());
+    serial_safety_from_main = nh.subscribe("serial_safety_from_main",1,serial_safety_msg_Callback,ros::TransportHints().tcpNoDelay());
     /////////////////////////////////////////////////PUBLISHER START//////////////////////////////////////////////////////
     PWMs = nh.advertise<std_msgs::Int16MultiArray>("PWMs", 1); // generated PWM data for logging
     PWM_generator = nh.advertise<std_msgs::Int32MultiArray>("command",1);  // generated PWM data for publish to pca9685
@@ -89,7 +100,7 @@ int main(int argc, char **argv)
 
     linear_velocity = nh.advertise<geometry_msgs::Vector3>("lin_vel",1);
     desired_velocity = nh.advertise<geometry_msgs::Vector3>("lin_vel_d",1);
-    linear_velocity_opti = nh.advertise<geometry_msgs::Vector3>("lin_vel_opti",1);//23.12.22
+    linear_velocity_opti = nh.advertise<geometry_msgs::Vector3>("lin_vel_opti",1);
 
     angular_velocity = nh.advertise<geometry_msgs::Vector3>("ang_vel",1);
 
@@ -105,6 +116,9 @@ int main(int argc, char **argv)
     delta_time = nh.advertise<std_msgs::Float32>("delta_t",1);
     ToSubAgent = nh.advertise<std_msgs::String>("ToSubData",1);
 
+    ///////////////////////////////////
+    serial_safety_server = nh.advertiseService("serial_safety_msg",serial_safety_req_Callback);
+
     
     ros::Timer timerPublish = nh.createTimer(ros::Duration(1.0/200.0),std::bind(publisherSet));
     ros::spin();
@@ -112,13 +126,12 @@ int main(int argc, char **argv)
 }
  void publisherSet(){
     Clock();
-
-
+ 
     shape_detector(); 
     // receiving data from arduino. (switch on off, connector servo rotation)
     // (swiching safety function +++)
     UpdateParameter(module_num); // setMoI,pid_Gain_Setting, etc. W.R.T. Combined or NOT
-    //Switching_safety(); //23.11.16
+    
     if(main_agent)
     {
       if(!kill_mode) // kill_mode toggle position
@@ -139,16 +152,16 @@ int main(int argc, char **argv)
       K_matrix();
       wrench_allocation(); //contain data_2_sub fucntion
       yaw_torque_distribute();
-
+      Switching_safety();
       PWM_signal_Generator(); //contain :: setSA, etc
-      
       }
       else
       {
         
-	      wrench_allocation();  //contain data_2_sub fucntion
+	wrench_allocation();  //contain data_2_sub fucntion
         reset_data();
-        pwm_Kill();
+	Switching_safety();
+        pwm_Kill(servo_angle,servo_angle);
         
       }
     }
@@ -162,10 +175,9 @@ int main(int argc, char **argv)
         }   
       else{
         reset_data();
-        pwm_Kill();
+        pwm_Kill(servo_angle,servo_angle);
         } 
     }
-
 
 
     PublishData();

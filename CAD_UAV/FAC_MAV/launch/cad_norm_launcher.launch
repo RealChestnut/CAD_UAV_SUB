@@ -1,14 +1,16 @@
 <launch>
 
+<?ignore
     <include file="$(find setting_tf2)/launch/tf2_setting.launch">
  </include>
+?> 
 
- <include file="$(find optitrack)/launch/optitrack.launch">
- </include>
+<include file="$(find optitrack)/launch/optitrack.launch">
+ </include> 
 
  <node pkg="setting_tf2_opti" type="setting_drone_tf_opti" name="setting_drone_tf_opti_node"/> 
 
-
+<?ignore
 <!-- Dynamixel Workbench Controller -->
   <include file="$(find dynamixel_workbench_controllers)/launch/position_control.launch">
         <arg name="device_name"        		default="/dev/ttyU2D2"/>
@@ -20,9 +22,10 @@
 	<arg name="position_d_gain"		default="300"/>
 	<arg name="scan_range"                  default="50"/> 
     </include> 
+?>
 
 
-<!-- ros_mscl -->
+s!-- ros_mscl -->
     <include file="$(find microstrain_inertial_driver)/launch/microstrain.launch">
 	  <arg name="params_file"            default = "" />
        <!--   <arg name="name"                   default = "gx5" /> -->
@@ -40,11 +43,13 @@
 	  <arg name="filter_child_frame_id"  default = "sensor" />
 	  <arg name="nmea_frame_id"          default = "nmea" />
 	  <arg name="use_enu_frame"          default = "false" />
-    </include> 
+    </include>
 
+<?ignore 
     <!-- t265 -->
     <include file="$(find realsense2_camera)/launch/rs_t265.launch">
     </include> 
+?>
 
 <!-- rosserial_arduino -->
     <node pkg="rosserial_arduino" type="serial_node.py" name="ros_arduino_PWMs" >
@@ -100,38 +105,42 @@
 	<!--Tilt flight mode-->
 		<!--Tilt Mode attitude_r gains-->
 
-		<param name="tilt_attitude_r_P_gain"	value="25.0"/> <!-- 8.5 -->	
-		<param name="tilt_attitude_r_I_gain"	value="1.2"/> <!-- 1.2 -->
+		<param name="tilt_attitude_r_P_gain"	value="20.0"/> <!-- 25 -->	
+		<param name="tilt_attitude_r_I_gain"	value="0"/> <!-- 1.2 -->
 		<param name="tilt_attitude_r_D_gain"	value="8.5"/> <!-- 8.5 -->
 		
 		<!--Tilt Mode attitude_p gains-->
-		<param name="tilt_attitude_p_P_gain"	value="25.0"/>	
-		<param name="tilt_attitude_p_I_gain"	value="1.2"/>	
+		<param name="tilt_attitude_p_P_gain"	value="20.0"/>	
+		<param name="tilt_attitude_p_I_gain"	value="0"/>	
 		<param name="tilt_attitude_p_D_gain"	value="8.5"/>
 
 		<!--Tilt Mode attitude_y gains-->
 		<param name="tilt_attitude_y_P_gain"	value="12.0"/> <!-- 35.0 -->
 		<param name="tilt_attitude_y_I_gain"	value="0.0"/> <!-- 0 -->
-		<param name="tilt_attitude_y_D_gain"	value="3.0"/> <!-- 6.0 -->
+		<param name="tilt_attitude_y_D_gain"	value="4.0"/> <!-- 6.0 -->
 
 
 		<!--Tilt Mode Altitude gains-->
-		<param name="tilt_altitude_P_gain"	value="0.5"/> <!--13.0--> 
-		<param name="tilt_altitude_I_gain"	value="3.0"/> <!--5.0-->
-		<param name="tilt_altitude_D_gain"	value="1.5"/> <!--8.0-->
+		<param name="tilt_altitude_P_gain"	value="14.0"/> <!--13.0, 2--> 
+		<param name="tilt_altitude_I_gain"	value="5.0"/> <!--5.0,  3-->
+		<param name="tilt_altitude_D_gain"	value="10.5"/> <!--8.0, 5-->
 
 		<!--Tilt Mode Velocity gains-->
-		<param name="tilt_velocity_P_gain"	value="0.6"/> <!-- 0.9 -->
-		<param name="tilt_velocity_I_gain"	value="0.1"/> <!-- 0.2 -->
-		<param name="tilt_velocity_D_gain"	value="0.1"/> <!-- 0.2 -->
+		<param name="tilt_velocity_P_gain"	value="0.9"/> <!-- 0.9 -->
+		<param name="tilt_velocity_I_gain"	value="0.2"/> <!-- 0.2 -->
+		<param name="tilt_velocity_D_gain"	value="0.2"/> <!-- 0.2 -->
 
 		<!--Tilt Mode Position gains-->
-		<param name="tilt_position_P_gain"	value="1.0"/> <!--2.0 -->	
+		<param name="tilt_position_P_gain"	value="3.0"/> <!--2.0 -->	
 		<param name="tilt_position_I_gain"	value="0.01"/>	<!--0.01 -->
-		<param name="tilt_position_D_gain"	value="1.0"/>	<!--2.0 -->
+		<param name="tilt_position_D_gain"	value="6.0"/>	<!--2.0 -->
+    
+
     <node name="cad_uav_node"  pkg="FAC_MAV" type="cad_uav" output="screen"/>
-    <node pkg="serial_module" type="serial_magnetic_sub_node" name="serial_magnetic_module"/>
-    <node pkg="receive_command_GUI" type="receive_command_GUI_node" name="receive_command_GUI_node"/>
+
+<?ignore    <node pkg="serial_module" type="serial_magnetic_sub_node" name="serial_magnetic_module"/>  ?>
+    <node pkg="receive_command_GUI" type="receive_command_GUI_node" name="receive_command_GUI_node"/> 
+
     <node pkg="data_logging" name="data_logging_node" type="data_logging"/>
 
 <node pkg="rosbag" type="record" name="record" output="screen" args="-o /home/cad_uav2/catkin_ws/src/CAD_UAV/FAC_MAV/bag/ /data_log" />

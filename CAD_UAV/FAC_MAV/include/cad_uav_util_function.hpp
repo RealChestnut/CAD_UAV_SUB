@@ -12,6 +12,7 @@
 #include <sensor_msgs/Imu.h>
 #include <trajectory_msgs/JointTrajectory.h>
 
+#include <std_msgs/Bool.h>
 #include <std_msgs/MultiArrayLayout.h>
 #include <std_msgs/MultiArrayDimension.h>
 #include <std_msgs/Int16MultiArray.h>
@@ -32,7 +33,7 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/static_transform_broadcaster.h>
 #include "nav_msgs/Odometry.h"
-
+#include "FAC_MAV/serial_safety_msg.h"
 
 std_msgs::Int16MultiArray PWMs_cmd;
 std_msgs::Int32MultiArray PWMs_val;
@@ -89,7 +90,7 @@ void pwm_Max(){
 	PWMs_val.data[15] = -1;
 }
 
-void pwm_Kill(){
+void pwm_Kill(double pwm_servo1, double pwm_servo2){
 	PWMs_cmd.data.resize(4);
 	PWMs_cmd.data[0] = 1000;
 	PWMs_cmd.data[1] = 1000;
@@ -100,8 +101,8 @@ void pwm_Kill(){
 	PWMs_val.data[1] = pwmMapping(1000.);
 	PWMs_val.data[2] = pwmMapping(1000.);
 	PWMs_val.data[3] = pwmMapping(1000.);
-	PWMs_val.data[4] = -1;
-	PWMs_val.data[5] = -1;
+	PWMs_val.data[4] = -1;//pwmMapping(pwm_servo1);
+	PWMs_val.data[5] = -1;//pwmMapping(pwm_servo2);
 	PWMs_val.data[6] = -1;
 	PWMs_val.data[7] = -1;
 	PWMs_val.data[8] = -1;

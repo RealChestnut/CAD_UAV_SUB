@@ -72,6 +72,7 @@ ros::Publisher button("switch_onoff", &isdock);
 // Battery Voltage Check=================================================
 #define BATTERY_V_PIN            A0
 #define btn  A5
+#define btn2 A6
 uint8_t sbus_data[25] = {0x0f, 0x01, 0x04, 0x20, 0x00, 0xff, 0x07, 0x40, 0x00, 0x02, 0x10, 0x80, 0x2c, 0x64, 0x21, 0x0b, 0x59, 0x08, 0x40, 0x00, 0x02, 0x10, 0x80, 0x00, 0x00};
 int16_t channels[18]  = {1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023, 1023, 0, 0};
 uint8_t  failsafe_status = SBUS_SIGNAL_FAILSAFE;
@@ -178,7 +179,9 @@ void setup() {
   Serial1.begin(100000, SERIAL_8E2);
   pinMode(BATTERY_V_PIN, INPUT);
   pinMode(btn, INPUT);
+  pinMode(btn2, INPUT);
   digitalWrite(btn, HIGH);
+  digitalWrite(btn2, HIGH);
   sbus_msg.data = (short int *)malloc(sizeof(short int) * 10);
   sbus_msg.data_length = 10;
   nh.initNode();
@@ -207,7 +210,7 @@ void loop() {
   sbus_msg.data[8] = channel(10);
   sbus_msg.data[9] = channel(13);
   ////////////////////////////////////
-  if (digitalRead(btn) == LOW)
+  if ((digitalRead(btn) == LOW) && (digitalRead(btn2) == LOW))
   {
     isdock.data = 0;
     button.publish(&isdock);

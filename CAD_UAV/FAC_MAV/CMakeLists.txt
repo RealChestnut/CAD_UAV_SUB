@@ -70,6 +70,7 @@ add_service_files(
   HoverService.srv
   FAC_HoverService.srv
   TiltService.srv
+  serial_safety_msg.srv
 )
 
 
