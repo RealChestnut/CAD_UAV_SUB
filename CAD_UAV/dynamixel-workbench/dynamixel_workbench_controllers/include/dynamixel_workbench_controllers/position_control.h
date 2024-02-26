@@ -51,6 +51,8 @@ class PositionControl
 
   // Dynamixel Workbench Parameters
   DynamixelWorkbench *dxl_wb_;
+  DynamixelWorkbench *dxl_wb_cur;
+
   uint8_t dxl_id_[16];
   uint8_t dxl_cnt_;
 
@@ -64,7 +66,7 @@ class PositionControl
 
   void initPublisher();
   void initSubscriber();
-  void dynamixelStatePublish();
+ void dynamixelStatePublish();
   void jointStatePublish();
 
   void initServer();

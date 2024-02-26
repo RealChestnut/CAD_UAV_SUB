@@ -1002,7 +1002,6 @@ void attitude_controller()
 
   }
 
-  if(Sbus[6]<1500){tau_rpy_desired.x+=-5;}
 
 
 
@@ -1776,7 +1775,7 @@ void sbus_Callback(const std_msgs::Int16MultiArray::ConstPtr& array)
   if(main_agent && mono_flight){ //if sub drone
       if(Sbus[5]>1500) altitude_mode=true;
       else altitude_mode=false;
-/*
+
       if(Sbus[6]<1300){
         attitude_mode=true;
         velocity_mode=false;
@@ -1789,7 +1788,7 @@ void sbus_Callback(const std_msgs::Int16MultiArray::ConstPtr& array)
         attitude_mode=false;
         velocity_mode=false;
         position_mode=true;}
-*/
+
       if(Sbus[7]>1500){
 	DOB_mode=true;}
       else{
@@ -1855,10 +1854,13 @@ int x_s = 0;
 int switch_CoF = 0.01;
 void switch_Callback(const std_msgs::UInt16& msg)
 {
-
+/*
   x_s_dot=-switch_CoF*x_x+static_cast<char>(msg.data);
   x_s+=x_s_dot*delta_t.count();
   switch_toggle_from_ardu =switch_CoF*x_s;
+  */
+switch_toggle_from_ardu = msg.data;
+	
  
 }
 

@@ -88,12 +88,13 @@ int x_s_dot = 0;
 int x_s = 0;
 int switch_CoF = 0.01;
 void switch_data_callback(const std_msgs::UInt16& msg){
-    //switch_data = msg->data;
+    switch_data = msg.data;
+    /*
     x_s_dot=-switch_CoF*x_s+static_cast<char>(msg.data);
   x_s+=x_s_dot*delta_t.count();
   switch_data =switch_CoF*x_s;
   if(switch_data==1){ROS_INFO_STREAM(switch_data);}
-   
+   */
 }
 
 bool is_Appr=false;
@@ -182,13 +183,7 @@ int main (int argc, char** argv){
                     safety_cnt=0;
                     init_serial=false;}
 
-/*
-	    if(init_serial && (buffer.find("ABCD")!=string::npos))
-	    {
-		    //ROS_INFO("CLEAR");
-		    ser.write("ABCD");
-	    }
-	    */
+	    
 	    if((buffer.find("START")!=string::npos) && init_serial)
 	    {
 		    ROS_INFO("START");

@@ -1,9 +1,10 @@
 <launch>
-  <arg name="device_name"      default="/dev/ttyUSB0"/>
-  <arg name="baud_rate"        default="3000000"/>
+  <arg name="device_name"      default="/dev/ttyU2D2"/>
+  <arg name="baud_rate"        default="4500000"/>
 
   <arg name="pan_id"           default="1"/>
   <arg name="tilt_id"          default="2"/>
+  <arg name="scan_range"       default="40"/>
 
   <arg name="p_gain"           default="0.003"/>
   <arg name="d_gain"           default="0.00002"/>

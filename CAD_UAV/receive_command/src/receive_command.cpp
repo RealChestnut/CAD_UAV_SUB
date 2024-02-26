@@ -67,11 +67,12 @@ int x_s_dot = 0;
 int x_s = 0;
 int switch_CoF = 0.01;
 void switch_data_callback(const std_msgs::UInt16& msg){
-    //switch_data = msg->data;
-    
+    switch_data = msg.data;
+    /*
    x_s_dot=-switch_CoF*x_s+static_cast<char>(msg.data);
    x_s+=x_s_dot*delta_t.count();
    switch_data =switch_CoF*x_s;	
+   */
 
 }
 
@@ -153,7 +154,7 @@ int main (int argc, char** argv){
            }
            ForToString = to_string(final_dock_safety_msg_);
 
-           ser.write(ForToString); // For dock safety
+           //ser.write(ForToString); // For dock safety
 	    
 		
 	    //ROS_INFO_STREAM(buffer);
@@ -198,54 +199,70 @@ string B__="";
 string C__="";
 string Fin__="";
 
+int solution(string msg) {
+    int answer = 0;
+    char cstr[3];
+    strcpy(cstr,msg.c_str());
+
+    for (int i = 0; i<strlen(cstr);i++) {
+            if (cstr[i] > 47 && cstr[i] < 58) { // 숫자 판별
+            answer = (answer * 10) + (cstr[i] - 48); // 자릿값 올리면서 갱신
+        }
+    }
+
+    return answer;
+}
+
 void parseData(const string& str, vector<string>& values,string& delimiter){
-	string msg;
-	msg.assign(str);
-	/*
-	if((msg.find('<')!=string::npos) && (msg.find('>')!=string::npos))
-	{
-		msg.erase(std::find(msg.begin(),msg.end(),'<'));
-		msg.erase(std::find(msg.begin(),msg.end(),'>'));
-	}
+        string msg;
+        msg.assign(str);
+        /*
+        if((msg.find('<')!=string::npos) && (msg.find('>')!=string::npos))
+        {
+                msg.erase(std::find(msg.begin(),msg.end(),'<'));
+                msg.erase(std::find(msg.begin(),msg.end(),'>'));
+        }
 
-		
-	string::size_type Fpos = msg.find_first_not_of(delimiter,0);
-	string::size_type Lpos = msg.find_first_of(delimiter, Fpos);
-	while (string::npos != Fpos || string::npos != Lpos)
-	{
-		
-	
-		values.push_back(msg.substr(Fpos, Lpos - Fpos));
-		
-		
 
-		Fpos = msg.find_first_not_of(delimiter, Lpos);
-		Lpos = msg.find_first_of(delimiter, Fpos);
-		
-	}*/
+        string::size_type Fpos = msg.find_first_not_of(delimiter,0);
+        string::size_type Lpos = msg.find_first_of(delimiter, Fpos);
+        while (string::npos != Fpos || string::npos != Lpos)
+        {
+
+
+                values.push_back(msg.substr(Fpos, Lpos - Fpos));
+
+
+
+                Fpos = msg.find_first_not_of(delimiter, Lpos);
+                Lpos = msg.find_first_of(delimiter, Fpos);
+
+        }*/
+
         string A_ = "";
-	if(msg.find("<0A") !=string::npos){
+        if(msg.find("<0A") !=string::npos){
 
-		A_ = msg.substr(msg.find("<0A"),3);
-	
-	}
-	
-	if(msg.find("<1A") !=string::npos){
+                A_ = msg.substr(msg.find("<0A"),3);
 
-		A_ = msg.substr(msg.find("<1A"),3);
+        }
 
-	}
-	
-	if(!A_.empty()){
-		A__ = regex_replace( A_ , regex("[^0-9]"), "" );
-		values[0]= A__;
-		
-	}
+        if(msg.find("<1A") !=string::npos){
 
-	//////////////////////////////////////////////////////////////
-	
+                A_ = msg.substr(msg.find("<1A"),3);
 
-	string B_ = "";
+        }
+        if(!A_.empty()){
+                //A__ = regex_replace( A_ , regex("[^0-9]"), "" );
+                A__ = to_string(solution(A_));
+
+
+
+        }
+
+
+        //////////////////////////////////////////////////////////////
+
+        string B_ = "";
         if(msg.find("B0C") !=string::npos){
 
                 B_ = msg.substr(msg.find("B0C"),3);
@@ -259,15 +276,15 @@ void parseData(const string& str, vector<string>& values,string& delimiter){
         }
 
         if(!B_.empty()){
-                B__ = regex_replace( B_ , regex("[^0-9]"), "" );
-		values[1]= B__;
+               // B__ = regex_replace( B_ , regex("[^0-9]"), "" );
+               B__ = to_string(solution(B_));
 
         }
 
 
         //////////////////////////////////////////////////////////////
-	
-	string C_ = "";
+
+        string C_ = "";
         if(msg.find("D0>") !=string::npos){
 
                 C_ = msg.substr(msg.find("D0>"),3);
@@ -281,11 +298,10 @@ void parseData(const string& str, vector<string>& values,string& delimiter){
         }
 
         if(!C_.empty()){
-                C__ = regex_replace( C_ , regex("[^0-9]"), "" );
-		values[2]= C__;
+                //C__ = regex_replace( C_ , regex("[^0-9]"), "" ); //regex 이부분 다른 코드로 교체
+                C__ = to_string(solution(C_));
 
         }
-
         //////////////////////////////////////////////////////////////
 	/*
 	ROS_INFO("AAA");
