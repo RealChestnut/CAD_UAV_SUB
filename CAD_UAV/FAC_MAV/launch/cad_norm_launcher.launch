@@ -22,6 +22,7 @@
 	<arg name="scan_range"                  default="50"/> 
     </include> 
 
+
 s!-- ros_mscl -->
     <include file="$(find microstrain_inertial_driver)/launch/microstrain.launch">
 	  <arg name="params_file"            default = "" />
@@ -135,8 +136,8 @@ s!-- ros_mscl -->
 
     <node name="cad_uav_node"  pkg="FAC_MAV" type="cad_uav" output="screen"/>
 
-<!--    <node pkg="serial_module" type="serial_magnetic_sub_node" name="serial_magnetic_module"/> -->
-<!--    <node pkg="receive_command_GUI" type="receive_command_GUI_node" name="receive_command_GUI_node"/>  -->
+    <node pkg="serial_module" type="serial_magnetic_sub_node" name="serial_magnetic_module"/> 
+    <node pkg="receive_command_GUI" type="receive_command_GUI_node" name="receive_command_GUI_node"/>  
 
     <node pkg="data_logging" name="data_logging_node" type="data_logging"/>
 

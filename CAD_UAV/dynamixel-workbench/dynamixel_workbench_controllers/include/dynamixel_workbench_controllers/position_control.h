@@ -56,6 +56,9 @@ class PositionControl
   uint8_t dxl_id_[16];
   uint8_t dxl_cnt_;
 
+  uint8_t dxl_id_cur[16];
+  uint8_t dxl_cnt_cur;
+
  public:
   PositionControl();
   ~PositionControl();

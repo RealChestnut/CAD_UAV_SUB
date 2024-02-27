@@ -336,6 +336,7 @@ Eigen::VectorXd lin_vel_LPF(3);
 
 //SERVO ANGLE CALLBACK//
 Eigen::VectorXd servo_theta(5);
+double servo_trailer=0.0;
   
 
 //IMU DATA CALLBACK//
@@ -401,6 +402,7 @@ char switch_toggle_from_ardu=1;
 bool is_Dock=false; // docking process toggle
 bool is_Appr=false; // approching process toggle
 bool is_Mani=false; // auto battery switching only combined mode
+char is_Mani_cnt = 0;
 
 
 // Wrench Allocation Data(torque, force) && Kill_Switch Command From Main //
@@ -742,7 +744,7 @@ int Land_Checker = 0;
 
 //////dynamixel stick input/////// 23.10.19 - songyeongin
 double swap_dynamixel_vel_limit = 0.01;
-double swap_dynamixel_angle=0.0;
+float swap_dynamixel_angle=0;
 double swap_dynamixel_ang_d=servo_theta(4); // 다이나믹셀 초기값으로 초기화
 /////////////////////////////////
 double cnt_deltaPy=0;
@@ -877,14 +879,7 @@ void Manipulating(){
   double delta_Yaw = (main_attitude_opti.z-sub_attitude_opti.z);
   if(is_Mani)
   {
-    /*
-    DOB_mode = true;
 
-    if(!main_agent && !mono_flight){ /// 서브드론의 경우 Sbus[3]를 다이나믹셀 position desired input으로 사용
-
-        swap_dynamixel_angle  = 0.01*(((float)Sbus[3]-(float)1500)/(float)500); // angle data generate
-        swap_dynamixel_ang_d += swap_dynamixel_angle;
-    */
   }
   //if(!is_Mani){DOB_mode=false;}
   }
@@ -1529,12 +1524,23 @@ void PWM_signal_Generator()
 
   
   if(!main_agent && !mono_flight){ /// 서브드론의 경우 Sbus[3]를 다이나믹셀 position desired input으로 사용
-
-        swap_dynamixel_angle  = 0.01*(((float)Sbus[3]-(float)1500)/(float)500); // angle data generate
+	
+        //swap_dynamixel_angle  = 0.01*(((float)Sbus[3]-(float)1500)/(float)500); // angle data generate
+	if(is_Mani == true){swap_dynamixel_angle = 0.01;
+	if(servo_trailer > 900){swap_dynamixel_angle = 0.0;}}
+	if(is_Mani == false){
+		swap_dynamixel_angle = -0.01;
+	if(servo_trailer <-50){swap_dynamixel_angle = 0.0;}}
+/*
+	if(servo_trailer >950){
+		swap_dynamixel_angle = -0.01; }	
+	if( servo_trailer <-100){ 
+		swap_dynamixel_angle = 0.01;}*/
         swap_dynamixel_ang_d += swap_dynamixel_angle;
 	//ROS_INFO_STREAM(Sbus[3]);
-	//ROS_INFO_STREAM(swap_dynamixel_ang_d);
-	//ROS_INFO_STREAM(swap_dynamixel_angle);
+	ROS_INFO_STREAM(swap_dynamixel_ang_d);
+	ROS_INFO("--------------");
+	ROS_INFO_STREAM(swap_dynamixel_angle);
 	}
   
   //pwm_Kill();
@@ -1663,6 +1669,7 @@ void jointstate_Callback(const sensor_msgs::JointState& msg)
     servo_theta(2)=msg.position[2];
     servo_theta(3)=msg.position[3];
     servo_theta(4)=msg.position[4];
+    servo_trailer =msg.effort[4];
 }
 
 
