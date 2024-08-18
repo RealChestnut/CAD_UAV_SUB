@@ -66,7 +66,7 @@ s!-- ros_mscl -->
         <param name="baud" value="57600"/>
     </node>
 
-	<node pkg="pwm_pca9685" type="pca9685_node" name="pwm_generator"/>
+	<node pkg="pwm_pca9685" type="pca9685_node" name="pwm_generator"/> 
 
 
     <!-- FAC_MAV_Controller -->

@@ -742,6 +742,7 @@ int Land_Checker = 0;
 double swap_dynamixel_vel_limit = 0.01;
 float swap_dynamixel_angle=0;
 double swap_dynamixel_ang_d=servo_theta(4); // 다이나믹셀 초기값으로 초기화
+int swap_dynamixel_ang_init = 0;
 /////////////////////////////////
 double cnt_deltaPy=0;
 double cnt_deltaPy_limit=3;
@@ -1432,7 +1433,7 @@ double x_th1 = 0;
 double x_th2 = 0;
 double x_th3 = 0;
 double x_th4 = 0;
-double th_cut_off_freq = 15.0; // origin :: 5
+double th_cut_off_freq = 50.0; // origin :: 5
 
 Eigen::VectorXd servo_LPF(4);
 
@@ -1522,11 +1523,16 @@ void PWM_signal_Generator()
   if(!main_agent && !mono_flight){ /// 서브드론의 경우 Sbus[3]를 다이나믹셀 position desired input으로 사용
 	
         //swap_dynamixel_angle  = 0.01*(((float)Sbus[3]-(float)1500)/(float)500); // angle data generate
-	if(is_Mani == true){swap_dynamixel_angle = 0.01;
+	if(is_Mani == true){swap_dynamixel_angle = 0.025;
 	if(servo_trailer > 900){swap_dynamixel_angle = 0.0;}}
 	if(is_Mani == false){
-		swap_dynamixel_angle = -0.01;
-	if(servo_trailer <-50){swap_dynamixel_angle = 0.0;}}
+		swap_dynamixel_angle = -0.025;
+	if(servo_theta(4) <swap_dynamixel_ang_init ){swap_dynamixel_angle = 0.0;}
+	if(servo_trailer < -900){swap_dynamixel_angle = 0.01;}
+	else if( (servo_trailer > -900) && (servo_trailer < -200)){swap_dynamixel_angle = 0.0;}
+	//if((servo_trailer > -50) && (servo_trailer < 50)){swap_dynamixel_angle = 0.0; }
+	//if((servo_trailer >-50) && (servo_trailer <0)){swap_dynamixel_angle = 0.0;}
+	}
 /*
 	if(servo_trailer >950){
 		swap_dynamixel_angle = -0.01; }	
@@ -1601,7 +1607,9 @@ void reset_data()
   tau_rpy_desired.y=0.0;
   tau_rpy_desired.z=0.0;
 
+  
   swap_dynamixel_ang_d=servo_theta(4);
+  swap_dynamixel_ang_init = servo_theta(4);
 
   tau_y_th=0;
   servo_angle=map<int16_t>(0,0,180, 2000, 1000);
